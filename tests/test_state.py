@@ -1,4 +1,6 @@
-"""Minimal smoke tests for the haunted ruin escape prototype."""
+"""Minimal smoke tests for the haunted ruin escape prototype.
+廃墟脱出プロトタイプ用の簡易スモークテスト。
+"""
 
 import unittest
 
@@ -36,7 +38,7 @@ class GameStateTest(unittest.TestCase):
         self.state.add_item(key)
         self.player.take_item(key)
         self.player.move_to("r2")
-        self.ghost.move_to("r1")  # keep ghost away from exit to simulate success
+        self.ghost.move_to("r1")  # keep ghost away from exit to simulate success / 成功パターンを再現するため幽霊を出口から離す
 
         self.state.check_victory()
 

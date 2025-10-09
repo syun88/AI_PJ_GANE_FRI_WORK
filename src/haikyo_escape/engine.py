@@ -1,8 +1,10 @@
 """
 Core loop skeleton for the haunted ruin escape.
+廃墟脱出ゲームのターン制ループ骨組み。
 
 This engine does not perform real I/O; instead it exposes hooks so teammates
 can plug in CLI, GUI, or scripted simulations.
+実際の入出力処理は行わず、CLI/GUI/自動テストを差し替えられるフックを提供する。
 """
 
 from __future__ import annotations
@@ -23,9 +25,11 @@ RevealFunc = Callable[[Room], None]
 class GameEngine:
     """
     Drives the turn-based flow.
+    ターン進行を管理する。
 
     The engine is deliberately thin; logic is delegated to injected callables so
     the team can parallelise work (UI, AI, rule expansions).
+    コアロジックはコールバックに委譲し、UI/AI/ルール拡張を並行開発できる構成にしている。
     """
 
     def __init__(
@@ -41,16 +45,19 @@ class GameEngine:
         self.reveal_room_fn = reveal_room_fn
 
     def run_turn(self) -> None:
-        """Execute a single player + ghost sequence."""
+        """Execute a single player + ghost sequence.
+        プレイヤーと幽霊の一連の処理を 1 ターン分だけ実行する。
+        """
         if self.state.is_over:
             return
 
         self.state.turn_count += 1
         self.state.phase = TurnPhase.PLAYER_DECISION
 
-        # Player decision (move or interact)
+        # Player decision (move or interact) / プレイヤーが移動や行動を選択するフェーズ
         action = self.player_choice_fn(self.state, self.state.player)
-        # プレイヤー入力はコールバックで分離しているため、GUI/自動化にも対応しやすい。
+        # Player input is injected via callback, making GUI/automation easy to swap.
+        # プレイヤー入力をコールバックにしたことで、GUI や自動化へ置き換えやすい。
         self.state.record(f"Turn {self.state.turn_count}: player chose {action}")
         self._resolve_player_action(action)
 
@@ -61,7 +68,7 @@ class GameEngine:
             current_room = self.state.rooms[self.state.player.room_id]
             self.reveal_room_fn(current_room)
 
-        # Ghost movement
+        # Ghost movement / 幽霊の移動フェーズ
         self.state.phase = TurnPhase.GHOST_MOVEMENT
         for ghost in self.state.ghosts:
             next_room_id = self.ghost_move_fn(self.state, ghost)
@@ -69,16 +76,18 @@ class GameEngine:
                 ghost.commit_move(next_room_id)
                 self.state.record(f"{ghost.name} moved to {ghost.room_id}")
 
-        # Resolution
+        # Resolution / 勝敗や終了条件の判定を実行
         self.state.phase = TurnPhase.RESOLUTION
         self.state.check_victory()
 
     def _resolve_player_action(self, action: str) -> None:
         """
         Handle abstract player actions.
+        プレイヤーの抽象的なアクションを解釈して処理する。
 
         TODO: Replace string-based actions with structured commands once the
         action list is finalised (e.g., dataclass MoveCommand).
+        TODO: アクション一覧が固まったら dataclass などで構造化して扱いやすくする。
         """
         if action.startswith("move:"):
             _, direction = action.split(":", 1)
@@ -110,8 +119,10 @@ class GameEngine:
     def _search_room(self) -> None:
         """
         Minimal search placeholder: reveal all items in the room.
+        探索の暫定実装。部屋内のアイテムをすべて公開する。
         """
-        # 検索処理の暫定実装。探索制限などはここを更新する。
+        # Update here when adding search limits or costs.
+        # 探索制限やコスト処理を追加する場合はこの部分を修正する。
         current_room_id = self.state.player.room_id
         found_items = [
             item
@@ -125,6 +136,6 @@ class GameEngine:
         random.shuffle(found_items)
         for item in found_items:
             item.hidden = False
-            # TODO: prompt player whether to pick up or leave the item.
+            # TODO: prompt player whether to pick up or leave the item. / 入手するか置いていくか選択肢を提示する。
             self.state.player.take_item(item)
             self.state.record(f"Found and picked up {item.name}.")

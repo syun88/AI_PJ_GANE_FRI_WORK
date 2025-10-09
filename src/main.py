@@ -1,8 +1,10 @@
 """
 Entry point for quick experiments with the haunted ruin escape prototype.
+廃墟脱出プロトタイプを手軽に試すためのエントリーポイント。
 
 This script wires the engine with very simple CLI callbacks so teammates can
 incrementally test mechanics without external dependencies.
+シンプルなCLIコールバックでエンジンを動かし、外部依存なしで検証できる。
 """
 
 from __future__ import annotations
@@ -12,6 +14,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+# Ensure the `src/` directory is on sys.path regardless of invocation style.
 # 実行方法に関わらず `src/` ディレクトリをモジュール検索パスに含める。
 PACKAGE_ROOT = Path(__file__).resolve().parent
 if str(PACKAGE_ROOT) not in sys.path:
@@ -24,7 +27,10 @@ from haikyo_escape.state import GameState
 
 
 def build_sample_state() -> GameState:
-    """Creates a tiny playable network of rooms for demonstration."""
+    """Creates a tiny playable network of rooms for demonstration.
+    サンプル用に小規模な部屋ネットワークを構築する。
+    """
+    # Define just three rooms for the sample; expand to ten for the full design.
     # サンプル用に3部屋のみ定義。10部屋版はこの辞書を拡張してください。
     rooms = {
         "entrance": Room(room_id="entrance", name="Entrance Hall"),
@@ -60,12 +66,14 @@ def build_sample_state() -> GameState:
     )
 
     game_state.add_item(key_item)
-    # TODO: ダミー鍵や障害物などもここで追加する。
+    # TODO: Add dummy keys and obstacles as the layout evolves. / ダミー鍵や障害物などもここで追加する。
     return game_state
 
 
 def print_welcome() -> None:
-    """Display basic instructions for CLI users."""
+    """Display basic instructions for CLI users.
+    CLI 利用者向けの簡単な説明を表示する。
+    """
     divider = "=" * 40
     print(divider)
     print(" Haunted Ruin Escape Prototype (CLI)")
@@ -75,7 +83,9 @@ def print_welcome() -> None:
 
 
 def print_help(room: Room, player: Player) -> None:
-    """Print the command list without consuming a turn."""
+    """Print the command list without consuming a turn.
+    ターンを消費せずにコマンド一覧を表示する。
+    """
     print("\n[Help] コマンド一覧 / Command reference")
     print("  move:<dir>  - 例: move:east。指定方向のドアがあれば移動します。")
     print("  search      - 現在の部屋を探索し、隠されたアイテムを見つけます。")
@@ -88,7 +98,9 @@ def print_help(room: Room, player: Player) -> None:
 
 
 def cli_player_choice(state: GameState, player: Player) -> str:
-    """Prompt-driven player input."""
+    """Prompt-driven player input.
+    プロンプトに基づきプレイヤーの入力を受け付ける。
+    """
     room = state.rooms[player.room_id]
     print(f"\n--- Turn {state.turn_count} ---")
     print(room.describe())
@@ -117,8 +129,10 @@ def cli_player_choice(state: GameState, player: Player) -> str:
 
 
 def random_ghost_move(state: GameState, ghost: Ghost) -> Optional[str]:
-    """Randomly pick an available door, respecting the no-repeat rule."""
-    # TODO: サイコロ対応表を導入したらここを差し替える。
+    """Randomly pick an available door, respecting the no-repeat rule.
+    連続同部屋禁止ルールを守りつつ、利用可能なドアからランダムに選ぶ。
+    """
+    # TODO: Replace with dice-based table when the official rule is ready. / サイコロ対応表を導入したらここを差し替える。
     room = state.rooms[ghost.room_id]
     options = []
     for direction, door in room.doors.items():

@@ -1,8 +1,10 @@
 """
 Test package initialisation.
+テストパッケージの初期化処理。
 
 Appends the local `src` directory to `sys.path` so the package can be imported
 without installing it. Keeps the project dependency-free.
+ローカルの `src` ディレクトリを `sys.path` に追加し、インストールなしでパッケージを読み込めるようにする。
 """
 
 from pathlib import Path
