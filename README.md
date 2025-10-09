@@ -37,11 +37,115 @@ Getting Started
    ```bash
    python -m src.main
    ```
-   - コマンド入力例: `move:east` で東側の部屋に移動、`search` で探索。
+   - 実行後はターンごとに行動を入力します。詳しくは下記「CLIの遊び方」を参照。
 3. **テスト実行**:
    ```bash
    python -m unittest discover -v
    ```
+
+CLI プレイガイド / How to Play via CLI
+---------------------------------------
+
+### EN
+1. Run `python -m src.main`.
+2. Each turn the script prints:
+   - Current room name, available doors, inventory, and turn number.
+3. Type one of the following commands and press Enter:
+   - `move:<direction>` – move through a door (`move:east`, `move:north`, etc.).
+   - `search` – reveal hidden items in the current room and pick them up.
+   - `wait` – skip your action (placeholder; same effect as doing nothing).
+   - `help` – print the command list again (handled by the CLI wrapper).
+   - `quit` – exit the prototype immediately.
+   - Any other string is ignored with a log entry.
+   - Pressing Enter with no input defaults to `search`.
+4. After the player action, ghosts move automatically and the result is logged.
+5. The loop continues until either:
+   - Player reaches the exit room while holding a key → **Winner: player**
+   - A ghost enters the player’s room → **Winner: ghosts**
+6. Session log is printed at the end for review.
+
+### 日本語
+
+1. `python -m src.main` を実行します。
+2. 毎ターン表示される情報:
+   - 現在いる部屋の名称とドアの方向
+   - 所持アイテム（鍵など）
+   - ターン番号
+3. 下記コマンドを入力して Enter:
+   - `move:<方向>` … 例: `move:east`（東）、`move:north`（北）。存在しない方向を指定すると移動失敗。
+   - `search` … 現在の部屋を探索し、隠れているアイテムを確認・取得（サンプルでは自動で拾う仕様）。
+   - `wait` … 行動をスキップ（現在は何も起こりませんが、ログに残ります）。
+   - `help` … コマンド一覧を再表示。
+   - `quit` … プロトタイプを即終了。
+   - その他の文字列 … 無視されますがログには記録されます。
+   - 何も入力せず Enter を押すと `search` が実行されます。
+4. プレイヤーの行動後、自動で幽霊が移動。ログに結果が残ります。
+5. 以下のいずれかでゲーム終了:
+   - プレイヤーが鍵を持ったまま出口の部屋に到達 → **勝利: プレイヤー**
+   - 幽霊がプレイヤーと同じ部屋に移動 → **勝利: 幽霊**
+6. 最後にログ一覧が表示されるので、紙プロトタイプの再現に利用してください。
+
+Command Reference / コマンド一覧
+--------------------------------
+
+| Command / コマンド | Description / 説明 |
+|--------------------|---------------------|
+| `move:<dir>`       | Move to the room connected via direction `<dir>` (e.g., `move:east`).<br>指定した方向のドアから隣室へ移動。 |
+| `search`           | Reveal hidden items in the current room and pick them up.<br>現在の部屋を探索し、隠されたアイテムを発見して取得。 |
+| `wait`             | Skip the turn. Useful when observing ghost behaviour during tests.<br>行動をスキップ。幽霊の動きを観察したい時に。 |
+| `help`             | Display the help text again.<br>ヘルプを再表示。 |
+| `quit`             | Exit the prototype immediately.<br>即時終了。 |
+
+Sample Session / サンプルプレイ
+-------------------------------
+
+```
+$ python -m src.main
+========================================
+ Haunted Ruin Escape Prototype (CLI)
+ Commands: move:<dir>, search, wait, help, quit
+ Exit with 'quit' or Ctrl+C
+========================================
+
+--- Turn 1 ---
+Entrance Hall (doors: east -> corridor)
+Inventory: []
+Doors: east
+Action (move:<dir>/search/wait/help/quit): search
+Found and picked up Rusty Key.
+
+--- Turn 2 ---
+Entrance Hall (doors: east -> corridor)
+Inventory: ['Rusty Key']
+Doors: east
+Action (move:<dir>/search/wait/help/quit): move:east
+Entered Long Corridor.
+幽霊B moved to entrance
+
+--- Turn 3 ---
+Long Corridor (doors: west -> entrance, north -> storage (locked))
+Inventory: ['Rusty Key']
+Doors: west, north
+Action (move:<dir>/search/wait/help/quit): move:north
+Player moved to storage
+Entered Dusty Storage.
+
+=== Game Over ===
+Winner: player
+Log:
+- Turn 1: player chose search
+- Found and picked up Rusty Key.
+- 幽霊A moved to corridor
+- 幽霊B moved to entrance
+- Turn 2: player chose move:east
+- Player moved to corridor
+- 幽霊A moved to storage
+- 幽霊B moved to entrance
+- Turn 3: player chose move:north
+- Player moved to storage
+- 幽霊A moved to corridor
+- 幽霊B moved to entrance
+```
 
 How to Develop / 開発の始め方
 -----------------------------
@@ -80,3 +184,5 @@ Open TODO Buckets
 - Decide how hidden information is revealed (search limits, dummy keys).
 - Replace string actions in `GameEngine` with structured commands.
 - Finalise logging format and decide on paper prototype sync procedure.
+*Ghost movement is random; your log may differ when you run the prototype.*  
+*幽霊の移動はランダムなので、実際のログは多少異なる可能性があります。*

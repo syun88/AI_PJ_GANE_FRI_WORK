@@ -8,7 +8,14 @@ incrementally test mechanics without external dependencies.
 from __future__ import annotations
 
 import random
+import sys
+from pathlib import Path
 from typing import Optional
+
+# 実行方法に関わらず `src/` ディレクトリをモジュール検索パスに含める。
+PACKAGE_ROOT = Path(__file__).resolve().parent
+if str(PACKAGE_ROOT) not in sys.path:
+    sys.path.insert(0, str(PACKAGE_ROOT))
 
 from haikyo_escape.engine import GameEngine
 from haikyo_escape.entities import Ghost, Item, ItemType, Player
@@ -57,15 +64,56 @@ def build_sample_state() -> GameState:
     return game_state
 
 
+def print_welcome() -> None:
+    """Display basic instructions for CLI users."""
+    divider = "=" * 40
+    print(divider)
+    print(" Haunted Ruin Escape Prototype (CLI)")
+    print(" Commands: move:<dir>, search, wait, help, quit")
+    print(" Exit with 'quit' or Ctrl+C / 終了: quit または Ctrl+C")
+    print(divider)
+
+
+def print_help(room: Room, player: Player) -> None:
+    """Print the command list without consuming a turn."""
+    print("\n[Help] コマンド一覧 / Command reference")
+    print("  move:<dir>  - 例: move:east。指定方向のドアがあれば移動します。")
+    print("  search      - 現在の部屋を探索し、隠されたアイテムを見つけます。")
+    print("  wait        - そのターンは何もしません。（幽霊の動きのみ観察）")
+    print("  help        - この一覧を再表示します。")
+    print("  quit        - すぐにゲームを終了します。")
+    print(" 現在の部屋:", room.describe())
+    inventory_names = [item.name for item in player.inventory] or ["なし / none"]
+    print(" 所持アイテム:", ", ".join(inventory_names))
+
+
 def cli_player_choice(state: GameState, player: Player) -> str:
     """Prompt-driven player input."""
     room = state.rooms[player.room_id]
-    print(f"\n--- Turn {state.turn_count + 1} ---")
+    print(f"\n--- Turn {state.turn_count} ---")
     print(room.describe())
     print(f"Inventory: {[item.name for item in player.inventory]}")
     print("Doors:", ", ".join(room.available_directions()) or "none")
-    action = input("Action (move:<dir>/search/end): ").strip().lower()
-    return action or "search"
+
+    while True:
+        action = input("Action (move:<dir>/search/wait/help/quit): ").strip().lower()
+
+        if not action:
+            return "search"
+
+        if action == "help":
+            print_help(room, player)
+            continue
+
+        if action == "quit":
+            state.is_over = True
+            state.winner = state.winner or "quit"
+            return "quit"
+
+        if action in {"search", "wait"} or action.startswith("move:"):
+            return action
+
+        print("[Invalid] 未知のコマンドです。help で一覧を確認してください。")
 
 
 def random_ghost_move(state: GameState, ghost: Ghost) -> Optional[str]:
@@ -88,6 +136,7 @@ def reveal_room(room: Room) -> None:
 
 def main() -> None:
     state = build_sample_state()
+    print_welcome()
     engine = GameEngine(
         state=state,
         player_choice_fn=cli_player_choice,

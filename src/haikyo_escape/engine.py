@@ -54,6 +54,9 @@ class GameEngine:
         self.state.record(f"Turn {self.state.turn_count}: player chose {action}")
         self._resolve_player_action(action)
 
+        if self.state.is_over:
+            return
+
         if self.reveal_room_fn:
             current_room = self.state.rooms[self.state.player.room_id]
             self.reveal_room_fn(current_room)
@@ -82,6 +85,12 @@ class GameEngine:
             self._move_player(direction.strip())
         elif action == "search":
             self._search_room()
+        elif action == "wait":
+            self.state.record("Player waits and observes.")
+        elif action == "quit":
+            self.state.is_over = True
+            self.state.winner = self.state.winner or "quit"
+            self.state.record("Player ended the session early.")
         else:
             self.state.record(f"Unknown action '{action}' ignored.")
 
