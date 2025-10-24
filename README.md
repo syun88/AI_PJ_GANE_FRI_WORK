@@ -119,18 +119,23 @@ Open TODOs / 今後の課題
 Flow Overview / フローチャート
 ------------------------------
 
-```
-Start → Build dungeon & seed RNG
-      → Initialise GameState / プレイヤー・幽霊配置
-      └─┬─ Loop per turn ────────────────────────────────┐
-        │ 1. Start-of-turn upkeep (効果ターン減算)       │
-        │ 2. CLI input → GameEngine._resolve_player_action│
-        │ 3. 勝敗チェック（鍵＋出口／幽霊接触）          │
-        │ 4. Ghost spawn rolls & movement (エンジン側)    │
-        │ 5. 再度勝敗チェック                             │
-        └─> Continue until GameState.is_over == True ─────┘
-End → Print session log / 結果表示
-```
+1. **初期化 / Setup**
+   - `build_default_dungeon()` でレイアウト・アイテム・開始位置を生成。
+   - `GameState` を作成し、プレイヤー・幽霊・アイテムを配置。必要なら乱数シードを設定。
+2. **ターン開始 / Start of Turn**
+   - `GameState.tick_start_of_turn()` で速度・凍結などの残りターンを減算し、ログを更新。
+3. **プレイヤー入力 / Player Action**
+   - CLI からコマンドを取得し `GameEngine._resolve_player_action()` で処理。
+   - 成功したアクションは `total_steps` や `action_count` に反映される。
+4. **勝敗判定① / Victory Check (player phase)**
+   - `GameState.check_victory()` が鍵＋出口到達、または幽霊接触を確認。
+5. **幽霊処理 / Ghost Phase**
+   - `GameEngine._maybe_spawn_ghosts()` で 1/6 判定によるスポーンを実行。
+   - `GameEngine._move_ghosts()` が各幽霊の移動距離をサイコロで決定し、最短経路で追跡。
+6. **勝敗判定② / Victory Check (ghost phase)**
+   - 幽霊移動後に再度 `check_victory()` を実行し、終了条件を確認。
+7. **ループ継続 / Continue**
+   - `GameState.is_over` が `False` なら次ターンへ。終了ならログと勝者を出力して終了。
 
 Data Structures / データ構造
 ----------------------------
