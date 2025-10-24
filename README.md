@@ -14,7 +14,7 @@ Project Layout / プロジェクト構成
   - `dungeon.py` – 標準レイアウトとアイテム配置ジェネレータ。
   - `engine.py` – ターン制ループ／コマンド解釈／幽霊スポーン処理。
   - `entities.py` – プレイヤー・幽霊・アイテムのデータ構造。
-  - `room.py` – 6×6 グリッド、ドア、一方通行タイルの定義。
+  - `room.py` – 6×6マス、ドア、一方通行タイルの定義。
   - `state.py` – ゲーム状態、移動・探索ロジック、勝敗判定。
   - `types.py` – 方向や座標の共通型。
 - `tests/test_state.py` – コア状態の単体テスト。
@@ -143,14 +143,14 @@ Data Structures / データ構造
 Name | Location | 説明
 ---- | -------- | ----
 `DungeonSetup` | `haikyo_escape.dungeon` | 生成した部屋・アイテム・開始／出口情報をまとめたコンテナ。
-`Room` | `haikyo_escape.room` | 幅・高さ・壁・探索マス・ドアを持つ6×6グリッド。ドア位置も記録。
+`Room` | `haikyo_escape.room` | 幅・高さ・壁・探索マス・ドアを持つ6×6マス。ドア位置も記録。
 `Door` | `haikyo_escape.room` | 接続先の部屋・ドア座標・鍵／一方通行情報を保持。
 `Item` | `haikyo_escape.entities` | アイテム種別と配置座標、メタデータ（効果ターンなど）を持つ。
 `ItemType` | `haikyo_escape.entities` | `KEY`, `DUMMY_KEY`, `GHOST_FREEZE`, `SPEED_BOOST`, `LORE` などの列挙型。
 `Player` | `haikyo_escape.entities` | 現在位置・インベントリ・速度効果ターンを追跡。
 `Ghost` | `haikyo_escape.entities` | 出現状態・凍結ターン・前回部屋を保持し、追跡AIに利用。
 `GameState` | `haikyo_escape.state` | ループ中の mutable state（部屋・プレイヤー・幽霊・アイテム・カウンタ類）。
-`Direction` | `haikyo_escape.types` | `N/E/S/W` のベクトルを提供する Enum。
+`Direction` | `haikyo_escape.types` | `N/E/S/W` のベクトルを提供する。
 
 Key Variables / 主な変数
 ------------------------
