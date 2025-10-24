@@ -1,10 +1,6 @@
 """
-Entry point for quick experiments with the haunted ruin escape prototype.
-廃墟脱出プロトタイプを手軽に試すためのエントリーポイント。
-
-This script wires the engine with very simple CLI callbacks so teammates can
-incrementally test mechanics without external dependencies.
-シンプルなCLIコールバックでエンジンを動かし、外部依存なしで検証できる。
+CLI entry point for the digital haunted ruin escape prototype.
+デジタル版「廃墟からの脱出」を手軽に試せるコマンドラインエントリ。
 """
 
 from __future__ import annotations
@@ -14,159 +10,169 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Ensure the `src/` directory is on sys.path regardless of invocation style.
-# 実行方法に関わらず `src/` ディレクトリをモジュール検索パスに含める。
+# Ensure the `src/` directory is importable even when running as `python src/main.py`.
 PACKAGE_ROOT = Path(__file__).resolve().parent
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
 
+from haikyo_escape.dungeon import build_default_dungeon
 from haikyo_escape.engine import GameEngine
-from haikyo_escape.entities import Ghost, Item, ItemType, Player
-from haikyo_escape.room import Door, Room
+from haikyo_escape.entities import Ghost, Player
 from haikyo_escape.state import GameState
 
 
-def build_sample_state() -> GameState:
-    """Creates a tiny playable network of rooms for demonstration.
-    サンプル用に小規模な部屋ネットワークを構築する。
-    """
-    # Define just three rooms for the sample; expand to ten for the full design.
-    # サンプル用に3部屋のみ定義。10部屋版はこの辞書を拡張してください。
-    rooms = {
-        "entrance": Room(room_id="entrance", name="Entrance Hall"),
-        "corridor": Room(room_id="corridor", name="Long Corridor"),
-        "storage": Room(room_id="storage", name="Dusty Storage"),
-    }
+def build_game_state(seed: Optional[int] = None) -> GameState:
+    rng = random.Random(seed)
+    setup = build_default_dungeon(rng)
 
-    rooms["entrance"].add_door("east", Door(target_room_id="corridor"))
-    rooms["corridor"].add_door("west", Door(target_room_id="entrance"))
-    rooms["corridor"].add_door("north", Door(target_room_id="storage", is_locked=True, requires_key=True))
-    rooms["storage"].add_door("south", Door(target_room_id="corridor"))
-
-    player = Player(entity_id="player", name="高校生ヒーロー", room_id="entrance")
+    player = Player(
+        entity_id="player",
+        name="高校生プレイヤー",
+        room_id=setup.start_room_id,
+        position=setup.start_position,
+    )
 
     ghosts = [
-        Ghost(entity_id="ghost_a", name="幽霊A", room_id="storage"),
-        Ghost(entity_id="ghost_b", name="幽霊B", room_id="corridor"),
+        Ghost(entity_id="ghost_a", name="白い影", room_id=setup.start_room_id, position=setup.start_position),
+        Ghost(entity_id="ghost_b", name="黒い影", room_id=setup.start_room_id, position=setup.start_position),
     ]
 
-    key_item = Item(
-        item_id="key_01",
-        name="Rusty Key",
-        item_type=ItemType.KEY,
-        room_id="entrance",
-        hidden=False,
-    )
-
-    game_state = GameState(
-        rooms=rooms,
+    state = GameState(
+        rooms=setup.rooms,
         player=player,
         ghosts=ghosts,
-        exit_room_id="storage",
+        exit_room_id=setup.exit_room_id,
+        exit_position=setup.exit_position,
+        start_room_id=setup.start_room_id,
+        start_position=setup.start_position,
+        safe_rooms=setup.safe_rooms,
+        rng_seed=seed,
     )
+    for item in setup.items.values():
+        state.add_item(item)
+    return state
 
-    game_state.add_item(key_item)
-    # TODO: Add dummy keys and obstacles as the layout evolves. / ダミー鍵や障害物などもここで追加する。
-    return game_state
 
-
-def print_welcome() -> None:
-    """Display basic instructions for CLI users.
-    CLI 利用者向けの簡単な説明を表示する。
-    """
-    divider = "=" * 40
+def print_welcome(seed: Optional[int]) -> None:
+    divider = "=" * 42
     print(divider)
-    print(" Haunted Ruin Escape Prototype (CLI)")
-    print(" Commands: move:<dir>, search, wait, help, quit")
-    print(" Exit with 'quit' or Ctrl+C / 終了: quit または Ctrl+C")
+    print(" Haunted Ruin Escape (Text Prototype)")
+    print(" Commands: move <dirs>, search, take [all], use <id>, wait, quit")
+    print(" Utility: help, look, inventory, items, log")
+    if seed is not None:
+        print(f" Seed: {seed}")
     print(divider)
 
 
-def print_help(room: Room, player: Player) -> None:
-    """Print the command list without consuming a turn.
-    ターンを消費せずにコマンド一覧を表示する。
-    """
-    print("\n[Help] コマンド一覧 / Command reference")
-    print("  move:<dir>  - 例: move:east。指定方向のドアがあれば移動します。")
-    print("  search      - 現在の部屋を探索し、隠されたアイテムを見つけます。")
-    print("  wait        - そのターンは何もしません。（幽霊の動きのみ観察）")
-    print("  help        - この一覧を再表示します。")
-    print("  quit        - すぐにゲームを終了します。")
-    print(" 現在の部屋:", room.describe())
-    inventory_names = [item.name for item in player.inventory] or ["なし / none"]
-    print(" 所持アイテム:", ", ".join(inventory_names))
+def print_help() -> None:
+    print("\n[Help / ヘルプ]")
+    print("  move <dir ...>  : 例) move north east  (加速中は最大2方向)")
+    print("  search          : 現在マスを探索し、アイテムを発見する")
+    print("  take [all|id]   : 発見済みアイテムを拾う（IDまたは一覧番号）")
+    print("  use <id|index>  : 所持アイテムを使用する（速度UPや幽霊停止など）")
+    print("  wait            : 何もせず様子を見る")
+    print("  quit            : ゲームを終了する")
+    print("  look            : 現在の部屋情報を再表示")
+    print("  inventory       : 所持アイテムを表示")
+    print("  items           : 足元にある発見済みアイテムを表示")
+    print("  log             : 直近のログを確認")
+
+
+def describe_room(state: GameState) -> None:
+    room = state.rooms[state.player.room_id]
+    print(f"\n[Location] {room.name} ({state.player.room_id})")
+    print(f" Position: {state.player.position}")
+    doors = ", ".join(f"{direction.name.lower()}" for direction in room.doors.keys()) or "none"
+    print(f" Doors: {doors}")
+    if room.explore_positions:
+        explore = ", ".join(str(pos) for pos in sorted(room.explore_positions))
+        print(f" Explore tiles: {explore}")
+    print(f" Movement speed: {state.player.current_speed} step(s) this turn")
+
+
+def list_inventory(state: GameState) -> None:
+    if not state.player.inventory:
+        print(" Inventory is empty.")
+        return
+    print(" Inventory:")
+    for idx, item in enumerate(state.player.inventory):
+        extra = item.metadata.get("duration")
+        meta = f" (duration={extra})" if extra is not None else ""
+        print(f"  [{idx}] {item.item_id} - {item.name}{meta}")
+
+
+def list_floor_items(state: GameState) -> None:
+    items = state.items_at_position(state.player.room_id, state.player.position, include_hidden=False)
+    if not items:
+        print(" No visible items on this tile.")
+        return
+    print(" Items on the ground:")
+    for idx, item in enumerate(items):
+        print(f"  [{idx}] {item.item_id} - {item.name}")
+
+
+def reveal_room(state: GameState) -> None:
+    room = state.rooms[state.player.room_id]
+    print(f"\n> You step into {room.name}.")
 
 
 def cli_player_choice(state: GameState, player: Player) -> str:
-    """Prompt-driven player input.
-    プロンプトに基づきプレイヤーの入力を受け付ける。
-    """
-    room = state.rooms[player.room_id]
-    print(f"\n--- Turn {state.turn_count} ---")
-    print(room.describe())
-    print(f"Inventory: {[item.name for item in player.inventory]}")
-    print("Doors:", ", ".join(room.available_directions()) or "none")
+    describe_room(state)
+    list_floor_items(state)
 
     while True:
-        action = input("Action (move:<dir>/search/wait/help/quit): ").strip().lower()
-
-        if not action:
-            return "search"
-
-        if action == "help":
-            print_help(room, player)
+        raw = input("\nCommand > ").strip()
+        if not raw:
             continue
 
-        if action == "quit":
-            state.is_over = True
-            state.winner = state.winner or "quit"
-            return "quit"
-
-        if action in {"search", "wait"} or action.startswith("move:"):
-            return action
-
-        print("[Invalid] 未知のコマンドです。help で一覧を確認してください。")
-
-
-def random_ghost_move(state: GameState, ghost: Ghost) -> Optional[str]:
-    """Randomly pick an available door, respecting the no-repeat rule.
-    連続同部屋禁止ルールを守りつつ、利用可能なドアからランダムに選ぶ。
-    """
-    # TODO: Replace with dice-based table when the official rule is ready. / サイコロ対応表を導入したらここを差し替える。
-    room = state.rooms[ghost.room_id]
-    options = []
-    for direction, door in room.doors.items():
-        if door.target_room_id == ghost.last_room_id and ghost.cannot_repeat_room:
+        lowered = raw.lower()
+        if lowered in {"help", "h", "?"}:
+            print_help()
             continue
-        options.append(door.target_room_id)
-    if not options:
-        return None
-    return random.choice(options)
+        if lowered in {"look", "l"}:
+            describe_room(state)
+            continue
+        if lowered in {"inventory", "inv", "i"}:
+            list_inventory(state)
+            continue
+        if lowered in {"items", "floor"}:
+            list_floor_items(state)
+            continue
+        if lowered == "log":
+            print("[Log]")
+            for entry in state.log[-10:]:
+                print(" ", entry)
+            continue
+
+        # Action commands delegate to the engine.
+        return lowered
 
 
-def reveal_room(room: Room) -> None:
-    print(f"Entered {room.name}.")
-
-
-def main() -> None:
-    state = build_sample_state()
-    print_welcome()
+def main(seed: Optional[int] = None) -> None:
+    state = build_game_state(seed)
+    print_welcome(seed)
     engine = GameEngine(
         state=state,
         player_choice_fn=cli_player_choice,
-        ghost_move_fn=random_ghost_move,
-        reveal_room_fn=reveal_room,
+        reveal_callback=reveal_room,
     )
 
     while not state.is_over:
         engine.run_turn()
 
     print("\n=== Game Over ===")
-    print("Winner:", state.winner)
-    print("Log:")
+    print(f"Winner: {state.winner}")
+    print("Final log:")
     for entry in state.log:
         print("-", entry)
 
 
 if __name__ == "__main__":
-    main()
+    cli_seed: Optional[int] = None
+    if len(sys.argv) > 1:
+        try:
+            cli_seed = int(sys.argv[1])
+        except ValueError:
+            print("Seed must be an integer.", file=sys.stderr)
+            sys.exit(1)
+    main(cli_seed)

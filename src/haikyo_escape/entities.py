@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from enum import Enum, auto
 from typing import Optional
 
+from .types import Direction, Position
+
 
 class ItemType(Enum):
     """Types of interactable items that can be placed in rooms.
@@ -23,8 +25,9 @@ class ItemType(Enum):
 
     KEY = auto()
     DUMMY_KEY = auto()
-    OBSTACLE = auto()
-    TOOL = auto()  # TODO: define tool uses (e.g., door unlock, distraction) / ツールの用途（ドア解錠・囮など）を後で定義する。
+    GHOST_FREEZE = auto()
+    SPEED_BOOST = auto()
+    LORE = auto()  # Flavor-only collectible / 収集要素（ゲーム進行には影響しない）
 
 
 @dataclass
@@ -38,6 +41,7 @@ class Item:
     item_type: ItemType
     room_id: str
     hidden: bool = True  # TODO: decide how hidden info is revealed to the player / 隠し情報をプレイヤーにいつ公開するか決める。
+    position: Optional[Position] = None
     metadata: dict[str, object] = field(default_factory=dict)
 
 
@@ -51,6 +55,7 @@ class Entity:
     name: str
     room_id: str
     is_active: bool = True
+    position: Position = (0, 0)
 
     def move_to(self, next_room_id: str) -> None:
         """Update the entity location.
@@ -58,6 +63,9 @@ class Entity:
         """
         # TODO: validate that the destination room exists and is connected. / 移動先の部屋が存在し接続されているか検証する。
         self.room_id = next_room_id
+
+    def set_position(self, position: Position) -> None:
+        self.position = position
 
 
 @dataclass
@@ -67,11 +75,12 @@ class Player(Entity):
     """
 
     inventory: list[Item] = field(default_factory=list)
+    speed_turns_remaining: int = 0
+    ghost_freeze_turns_remaining: int = 0
 
     def has_item_type(self, item_type: ItemType) -> bool:
         return any(item.item_type == item_type for item in self.inventory)
 
-    # TODO: evaluate whether aliasing helps or confuses future code. / エイリアスを残すべきか検討する。
     def has_item(self, item_type: ItemType) -> bool:
         return self.has_item_type(item_type)
 
@@ -85,6 +94,17 @@ class Player(Entity):
                 return self.inventory.pop(idx)
         return None
 
+    def apply_speed_boost(self, duration: int) -> None:
+        self.speed_turns_remaining = max(self.speed_turns_remaining, duration)
+
+    def tick_effects(self) -> None:
+        if self.speed_turns_remaining > 0:
+            self.speed_turns_remaining -= 1
+
+    @property
+    def current_speed(self) -> int:
+        return 2 if self.speed_turns_remaining > 0 else 1
+
 
 @dataclass
 class Ghost(Entity):
@@ -95,12 +115,11 @@ class Ghost(Entity):
     aggression: float = 0.5  # 0-1 scale; TODO: tune for difficulty settings / 難易度に合わせて調整する攻撃性パラメータ。
     cannot_repeat_room: bool = True
     last_room_id: Optional[str] = None
+    frozen_turns: int = 0
+    is_spawned: bool = False
 
     def choose_next_room(self, available_rooms: list[str]) -> Optional[str]:
-        """Placeholder logic for ghost movement decision.
-        幽霊の移動先を決める仮実装。
-        """
-        # TODO: replace with dice table or AI script. / サイコロ表やAIスクリプトに差し替える。
+        """Deprecated room-level movement hook (kept for backward compatibility)."""
         for room_id in available_rooms:
             if not self.cannot_repeat_room or room_id != self.last_room_id:
                 return room_id
@@ -109,3 +128,10 @@ class Ghost(Entity):
     def commit_move(self, next_room_id: str) -> None:
         self.last_room_id = self.room_id
         self.move_to(next_room_id)
+
+    def apply_freeze(self, duration: int) -> None:
+        self.frozen_turns = max(self.frozen_turns, duration)
+
+    def tick_effects(self) -> None:
+        if self.frozen_turns > 0:
+            self.frozen_turns -= 1

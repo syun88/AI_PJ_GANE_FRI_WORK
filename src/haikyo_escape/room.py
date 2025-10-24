@@ -1,72 +1,94 @@
 """
-Room layout abstractions.
-部屋レイアウトを扱う抽象化モジュール。
+Room layout abstractions for the digital haunted ruin escape.
+デジタル版廃墟脱出ゲーム向けの部屋レイアウト抽象化。
 
-Each room is represented as a 5x5 grid (default). Doors connect to other rooms.
-各部屋はデフォルトで 5x5 マスのグリッドとして表現され、ドアで別室と接続します。
-This module intentionally leaves concrete layout details for the team to define.
-具体的なレイアウト定義はチームで自由に決められるよう余白を残しています。
+Each room is a grid (default 6x6) with walls, exploration points, and doors that
+link to other rooms. One-way exits and locked doors are supported so designers
+can shape maze-like experiences.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Set
+
+from .types import Direction, Position
 
 
 @dataclass
 class Door:
-    """Represents a doorway between two rooms.
-    2 つの部屋を接続するドア情報を表す。
-    """
+    """Represents a doorway on a specific tile within a room."""
 
     target_room_id: str
+    position: Position
+    target_position: Position
+    direction: Direction
     is_locked: bool = False
     requires_key: bool = False
-    # TODO: add properties for one-way doors or trap behaviour if needed. / 片方向ドアや罠ギミックが必要ならプロパティを追加する。
+    one_way: bool = False
 
 
 @dataclass
 class Room:
-    """5x5 (configurable) room grid containing doors and items.
-    ドアやアイテムを含む 5x5（設定で変更可能）の部屋グリッド。
-    """
+    """6x6 room grid containing walls, exploration tiles, and door definitions."""
 
     room_id: str
     name: str
-    width: int = 5
-    height: int = 5
-    doors: Dict[str, Door] = field(default_factory=dict)  # direction -> Door / 方向名 -> Door
-    obstacles: set[tuple[int, int]] = field(default_factory=set)
+    width: int = 6
+    height: int = 6
+    doors: Dict[Direction, Door] = field(default_factory=dict)
+    walls: Set[Position] = field(default_factory=set)
+    explore_positions: Set[Position] = field(default_factory=set)
+    one_way_exits: Dict[Position, Set[Direction]] = field(default_factory=dict)
+    door_positions: Dict[Position, Door] = field(default_factory=dict)
 
-    def add_door(self, direction: str, door: Door) -> None:
-        """Attach a door to the room in a given direction.
-        指定した方向にドア情報を登録する。
-        """
-        # TODO: enforce consistent direction naming convention (N/E/S/W etc.) / 方向名を統一（N/E/S/W など）するルールを決める。
-        self.doors[direction] = door
-
-    def is_within_bounds(self, x: int, y: int) -> bool:
+    def is_within_bounds(self, position: Position) -> bool:
+        x, y = position
         return 0 <= x < self.width and 0 <= y < self.height
 
-    def add_obstacle(self, position: tuple[int, int]) -> None:
-        """Mark a grid position as blocked.
-        指定座標を障害物として扱う。
-        """
-        if not self.is_within_bounds(*position):
-            raise ValueError(f"Obstacle {position} is outside room bounds.")
-        self.obstacles.add(position)
+    def is_walkable(self, position: Position) -> bool:
+        return self.is_within_bounds(position) and position not in self.walls
+
+    def add_wall(self, position: Position) -> None:
+        if not self.is_within_bounds(position):
+            raise ValueError(f"Wall {position} is outside room bounds.")
+        self.walls.add(position)
+
+    def add_explore_position(self, position: Position) -> None:
+        if not self.is_within_bounds(position):
+            raise ValueError(f"Explore tile {position} is outside room bounds.")
+        self.explore_positions.add(position)
+
+    def add_one_way_exit(self, position: Position, allowed_directions: Iterable[Direction]) -> None:
+        if not self.is_within_bounds(position):
+            raise ValueError(f"One-way tile {position} is outside room bounds.")
+        self.one_way_exits[position] = set(allowed_directions)
+
+    def add_door(self, direction: Direction, door: Door) -> None:
+        if direction in self.doors:
+            raise ValueError(f"Door already registered for {direction} in {self.room_id}.")
+        if not self.is_within_bounds(door.position):
+            raise ValueError(f"Door position {door.position} is outside room bounds.")
+        self.doors[direction] = door
+        self.door_positions[door.position] = door
+
+    def door_at(self, position: Position) -> Optional[Door]:
+        return self.door_positions.get(position)
+
+    def allows_exit_from(self, position: Position, direction: Direction) -> bool:
+        allowed = self.one_way_exits.get(position)
+        return allowed is None or direction in allowed
 
     def available_directions(self) -> Iterable[str]:
-        return self.doors.keys()
+        return (direction.name.lower() for direction in self.doors.keys())
 
     def describe(self) -> str:
-        """Return a human-readable summary of the room.
-        部屋の概要を読みやすい文字列で返す。
-        """
-        # TODO: incorporate hidden info rules when revealing to the player. / 情報公開ルール（隠し要素の扱い）をここに組み込む。
+        """Return a human-readable summary of the room, including door states."""
         door_info = ", ".join(
-            f"{direction} -> {door.target_room_id}{' (locked)' if door.is_locked else ''}"
+            f"{direction.name.lower()} -> {door.target_room_id}"
+            f"{' (locked)' if door.is_locked else ''}"
+            f"{' (one-way)' if door.one_way else ''}"
             for direction, door in self.doors.items()
         )
-        return f"{self.name} (doors: {door_info or 'none'})"
+        explore_info = ", ".join(f"{pos}" for pos in sorted(self.explore_positions)) or "none"
+        return f"{self.name} (doors: {door_info or 'none'}, explore tiles: {explore_info})"

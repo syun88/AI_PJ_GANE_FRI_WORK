@@ -1,55 +1,105 @@
-"""Minimal smoke tests for the haunted ruin escape prototype.
-廃墟脱出プロトタイプ用の簡易スモークテスト。
-"""
+"""Unit tests for the haunted ruin escape state helpers."""
 
 import unittest
 
 from haikyo_escape.entities import Ghost, Item, ItemType, Player
 from haikyo_escape.room import Door, Room
-from haikyo_escape.state import GameState
+from haikyo_escape.state import ActionResult, GameState
+from haikyo_escape.types import Direction
 
 
 class GameStateTest(unittest.TestCase):
-    def setUp(self) -> None:
-        self.rooms = {
-            "r1": Room(room_id="r1", name="Room 1"),
-            "r2": Room(room_id="r2", name="Room 2"),
-        }
-        self.rooms["r1"].add_door("east", Door(target_room_id="r2"))
-        self.rooms["r2"].add_door("west", Door(target_room_id="r1"))
+    def make_state(self) -> GameState:
+        room_a = Room(room_id="room_a", name="Room A")
+        room_b = Room(room_id="room_b", name="Room B")
 
-        self.player = Player(entity_id="player", name="Hero", room_id="r1")
-        self.ghost = Ghost(entity_id="ghost", name="Ghost", room_id="r2")
-        self.state = GameState(
-            rooms=self.rooms,
-            player=self.player,
-            ghosts=[self.ghost],
-            exit_room_id="r2",
+        # Add a couple of walls to ensure collision checks behave.
+        room_a.add_wall((4, 1))
+        room_b.add_wall((2, 4))
+
+        # Exploration tiles so items can be placed.
+        room_a.add_explore_position((4, 2))
+        room_b.add_explore_position((0, 2))
+
+        room_a.add_door(
+            Direction.EAST,
+            Door(
+                target_room_id="room_b",
+                position=(5, 2),
+                target_position=(0, 2),
+                direction=Direction.EAST,
+            ),
+        )
+        room_b.add_door(
+            Direction.WEST,
+            Door(
+                target_room_id="room_a",
+                position=(0, 2),
+                target_position=(5, 2),
+                direction=Direction.WEST,
+            ),
         )
 
-    def test_player_has_key_triggers_victory(self) -> None:
+        player = Player(entity_id="player", name="Hero", room_id="room_a", position=(4, 2))
+
+        ghost = Ghost(entity_id="ghost", name="Test Ghost", room_id="room_b", position=(1, 1))
+        ghost.is_spawned = True
+
+        state = GameState(
+            rooms={"room_a": room_a, "room_b": room_b},
+            player=player,
+            ghosts=[ghost],
+            exit_room_id="room_b",
+            exit_position=(0, 2),
+            start_room_id="room_a",
+            start_position=(4, 2),
+            safe_rooms={"room_a"},
+        )
+        return state
+
+    def test_exit_requires_master_key(self) -> None:
+        state = self.make_state()
+        result = state.move_player_step(Direction.EAST)
+        self.assertEqual(result, ActionResult.SUCCESS)
+        self.assertEqual(state.player.room_id, "room_b")
+        state.check_victory()
+        self.assertFalse(state.is_over)
+        self.assertIsNone(state.winner)
+
+    def test_exit_with_master_key_wins(self) -> None:
+        state = self.make_state()
         key = Item(
-            item_id="key1",
-            name="Key",
+            item_id="master_key",
+            name="Master Key",
             item_type=ItemType.KEY,
-            room_id="r1",
+            room_id="room_a",
             hidden=False,
+            position=(4, 2),
+            metadata={"is_master": True},
         )
-        self.state.add_item(key)
-        self.player.take_item(key)
-        self.player.move_to("r2")
-        self.ghost.move_to("r1")  # keep ghost away from exit to simulate success / 成功パターンを再現するため幽霊を出口から離す
+        state.add_item(key)
+        self.assertTrue(state.pickup_item(key.item_id))
 
-        self.state.check_victory()
+        result = state.move_player_step(Direction.EAST)
+        self.assertEqual(result, ActionResult.SUCCESS)
+        state.check_victory()
+        self.assertTrue(state.is_over)
+        self.assertEqual(state.winner, "player")
 
-        self.assertTrue(self.state.is_over)
-        self.assertEqual(self.state.winner, "player")
+    def test_ghost_captures_player(self) -> None:
+        state = self.make_state()
+        state.player.move_to("room_b")
+        state.player.set_position((1, 1))
+        state.check_victory()
+        self.assertTrue(state.is_over)
+        self.assertEqual(state.winner, "ghosts")
 
-    def test_ghost_collides_with_player(self) -> None:
-        self.ghost.move_to("r1")
-        self.state.check_victory()
-        self.assertTrue(self.state.is_over)
-        self.assertEqual(self.state.winner, "ghosts")
+    def test_wall_blocks_movement(self) -> None:
+        state = self.make_state()
+        state.player.set_position((4, 2))
+        result = state.move_player_step(Direction.NORTH)
+        self.assertEqual(result, ActionResult.BLOCKED)
+        self.assertEqual(state.player.position, (4, 2))
 
 
 if __name__ == "__main__":
