@@ -150,7 +150,12 @@ flowchart TD
 
     L --> UseCmd[use: アイテム使用（加速 or 停止）]
     UseCmd --> EffectSet[効果ターンを設定]
-    EffectSet --> VictoryCheck
+    EffectSet --> EffectBoost[加速中: 5ターン間2マス移動可能]
+    EffectSet --> EffectFreeze[幽霊停止中: 対象部屋の幽霊が停止]
+    EffectSet --> EffectTunnel[ぼろ壁＋破壊アイテムで通路生成]
+    EffectBoost --> VictoryCheck
+    EffectFreeze --> VictoryCheck
+    EffectTunnel --> VictoryCheck
 
     L --> WaitCmd[wait: 様子を見る（ターン経過）]
     WaitCmd --> WaitLog[ログ更新]
