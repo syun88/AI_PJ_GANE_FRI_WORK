@@ -142,7 +142,8 @@ flowchart TD
 
     L --> SearchCmd[search: ピンク探索マスを調べる]
     SearchCmd --> RevealItems[隠しアイテムを発見・表示]
-    RevealItems --> VictoryCheck
+    RevealItems --> EffectTunnel[ぼろ壁＋破壊アイテムで通路生成]
+    EffectTunnel --> VictoryCheck
 
     L --> TakeCmd[take: アイテム取得]
     TakeCmd --> InventoryAdd[インベントリに追加]
@@ -152,10 +153,9 @@ flowchart TD
     UseCmd --> EffectSet[効果ターンを設定]
     EffectSet --> EffectBoost[加速中: 5ターン間2マス移動可能]
     EffectSet --> EffectFreeze[幽霊停止中: 対象部屋の幽霊が停止]
-    EffectSet --> EffectTunnel[ぼろ壁＋破壊アイテムで通路生成]
-    EffectBoost --> VictoryCheck
-    EffectFreeze --> VictoryCheck
-    EffectTunnel --> VictoryCheck
+    EffectSet --> VictoryCheck
+    EffectBoost --> NextTurn[次ターンへ戻る（ループ）]
+    EffectFreeze --> NextTurn
 
     L --> WaitCmd[wait: 様子を見る（ターン経過）]
     WaitCmd --> WaitLog[ログ更新]
