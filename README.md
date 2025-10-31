@@ -179,7 +179,7 @@ flowchart TD
     SpawnPlacement --> FreezeCheck
     FreezeCheck -- はい --> GhostStay[移動せず滞在]
     FreezeCheck -- いいえ --> GhostAdvance[幽霊の移動]
-    GhostAdvance --> GhostSteps[1マス(2/3) または 2マス(1/3) 移動]
+    GhostAdvance --> GhostSteps[1マス（約66%）または2マス（約33%）で移動]
     GhostSteps --> GhostChase[最短経路で追跡（安全部屋は回避）]
     GhostChase --> ContactCheck[接触判定]
     GhostStay --> ContactCheck
