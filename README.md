@@ -142,7 +142,7 @@ flowchart TD
 
     L --> SearchCmd[search: ピンク探索マスを調べる]
     SearchCmd --> RevealItems[隠しアイテムを発見・表示]
-    RevealItems --> GhostPhaseStart
+    RevealItems --> VictoryCheck
 
     L --> TakeCmd[take: アイテム取得]
     TakeCmd --> InventoryAdd[インベントリに追加]
