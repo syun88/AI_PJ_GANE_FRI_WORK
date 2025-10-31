@@ -18,8 +18,7 @@
 - `tests/test_state.py` – `GameState` を中心とした単体テスト。
 
 # 開発の仕方につい
-
-DEV_GUID.md を確認
+- `DEV_GUID.md` を確認
 
 セットアップと実行
 ------------------
