@@ -159,7 +159,7 @@ flowchart TD
 
     L --> WaitCmd[wait: 様子を見る（ターン経過）]
     WaitCmd --> WaitLog[ログ更新]
-    WaitLog --> GhostPhaseStart
+    WaitLog --> VictoryCheck
 
     L --> InfoCmd[look / help / quit: 情報コマンド]
     InfoCmd --> InfoProcess[情報コマンド処理]
