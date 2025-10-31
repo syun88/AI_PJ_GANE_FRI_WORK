@@ -27,6 +27,7 @@ class ItemType(Enum):
     DUMMY_KEY = auto()
     GHOST_FREEZE = auto()
     SPEED_BOOST = auto()
+    WALL_BREAKER = auto()
     LORE = auto()  # Flavor-only collectible / 収集要素（ゲーム進行には影響しない）
 
 
@@ -92,6 +93,12 @@ class Player(Entity):
         for idx, item in enumerate(self.inventory):
             if item.item_id == item_id:
                 return self.inventory.pop(idx)
+        return None
+
+    def find_item_of_type(self, item_type: ItemType) -> Optional[Item]:
+        for item in self.inventory:
+            if item.item_type == item_type:
+                return item
         return None
 
     def apply_speed_boost(self, duration: int) -> None:

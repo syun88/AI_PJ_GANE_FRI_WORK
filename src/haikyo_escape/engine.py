@@ -114,18 +114,18 @@ class GameEngine:
             )
             args = args[:max_steps]
 
-        moved = False
+        attempted = False
         for token in args:
             try:
                 direction = Direction.from_token(token)
             except ValueError:
                 self.state.record(f"Unsupported direction '{token}'.")
-                break
+                continue
 
+            attempted = True
             before_room = self.state.player.room_id
             result = self.state.move_player_step(direction)
             if result == ActionResult.SUCCESS:
-                moved = True
                 if self.reveal_callback and before_room != self.state.player.room_id:
                     self.reveal_callback(self.state)
             elif result == ActionResult.BLOCKED:
@@ -133,7 +133,7 @@ class GameEngine:
             else:
                 break
 
-        return moved
+        return attempted
 
     def _handle_take(self, args: list[str]) -> bool:
         current_items = self.state.items_at_position(
@@ -189,7 +189,7 @@ class GameEngine:
             duration = int(target_item.metadata.get("duration", 5))
             self.state.player.apply_speed_boost(duration)
             self.state.record(f"Speed boost activated for {duration} turn(s).")
-            self._consume_inventory_item(target_item.item_id)
+            self.state.consume_item(target_item.item_id)
             return True
 
         if target_item.item_type == ItemType.GHOST_FREEZE:
@@ -198,7 +198,7 @@ class GameEngine:
             for ghost in self.state.active_ghosts():
                 if ghost.room_id == self.state.player.room_id:
                     ghost.apply_freeze(duration)
-            self._consume_inventory_item(target_item.item_id)
+            self.state.consume_item(target_item.item_id)
             return True
 
         if target_item.item_type == ItemType.KEY:
@@ -213,16 +213,12 @@ class GameEngine:
             self.state.record("You skim the lore item. It might contain clues.")
             return False
 
+        if target_item.item_type == ItemType.WALL_BREAKER:
+            self.state.record("Search near brittle walls to put this breaker to use.")
+            return False
+
         self.state.record("That item cannot be used right now.")
         return False
-
-    def _consume_inventory_item(self, item_id: str) -> None:
-        self.state.player.drop_item(item_id)
-        # Keep the Item instance for logging/debugging but mark as consumed.
-        item = self.state.items.get(item_id)
-        if item:
-            item.room_id = "consumed"
-            item.position = None
 
     # ------------------------------------------------------------------
     # Ghost logic

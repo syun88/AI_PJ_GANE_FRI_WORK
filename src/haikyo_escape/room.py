@@ -38,6 +38,7 @@ class Room:
     height: int = 6
     doors: Dict[Direction, Door] = field(default_factory=dict)
     walls: Set[Position] = field(default_factory=set)
+    fragile_walls: Set[Position] = field(default_factory=set)
     explore_positions: Set[Position] = field(default_factory=set)
     one_way_exits: Dict[Position, Set[Direction]] = field(default_factory=dict)
     door_positions: Dict[Position, Door] = field(default_factory=dict)
@@ -59,6 +60,15 @@ class Room:
             raise ValueError(f"Explore tile {position} is outside room bounds.")
         self.explore_positions.add(position)
 
+    def add_fragile_wall(self, position: Position) -> None:
+        """Register a wall that can later be broken to create a tunnel."""
+        self.add_wall(position)
+        self.fragile_walls.add(position)
+
+    def remove_wall(self, position: Position) -> None:
+        self.walls.discard(position)
+        self.fragile_walls.discard(position)
+
     def add_one_way_exit(self, position: Position, allowed_directions: Iterable[Direction]) -> None:
         if not self.is_within_bounds(position):
             raise ValueError(f"One-way tile {position} is outside room bounds.")
@@ -78,6 +88,9 @@ class Room:
     def allows_exit_from(self, position: Position, direction: Direction) -> bool:
         allowed = self.one_way_exits.get(position)
         return allowed is None or direction in allowed
+
+    def is_fragile_wall(self, position: Position) -> bool:
+        return position in self.fragile_walls
 
     def available_directions(self) -> Iterable[str]:
         return (direction.name.lower() for direction in self.doors.keys())

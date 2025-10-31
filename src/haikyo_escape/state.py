@@ -114,6 +114,7 @@ class GameState:
             )
         else:
             self.record("Search found nothing.")
+        self._try_create_tunnel()
         return visible
 
     def pickup_item(self, item_id: str) -> bool:
@@ -128,6 +129,13 @@ class GameState:
         item.hidden = False
         self.record(f"Picked up {item.name}.")
         return True
+
+    def consume_item(self, item_id: str) -> None:
+        """Remove an item from the player's inventory after it is spent."""
+        consumed = self.player.drop_item(item_id)
+        if consumed:
+            consumed.room_id = "consumed"
+            consumed.position = None
 
     # ------------------------------------------------------------------
     # Movement
@@ -275,6 +283,34 @@ class GameState:
 
     def is_room_frozen(self, room_id: str) -> bool:
         return self.room_freeze_turns.get(room_id, 0) > 0
+
+    def _try_create_tunnel(self) -> bool:
+        """Break adjacent fragile walls when the player has a breaker item."""
+        room = self.rooms[self.player.room_id]
+        if not room.fragile_walls:
+            return False
+
+        adjacent_fragile: list[Position] = []
+        for direction in Direction:
+            dx, dy = direction.delta
+            candidate = (self.player.position[0] + dx, self.player.position[1] + dy)
+            if room.is_fragile_wall(candidate):
+                adjacent_fragile.append(candidate)
+
+        if not adjacent_fragile:
+            return False
+
+        breaker = self.player.find_item_of_type(ItemType.WALL_BREAKER)
+        if breaker is None:
+            return False
+
+        target = adjacent_fragile[0]
+        room.remove_wall(target)
+        self.consume_item(breaker.item_id)
+        self.record(
+            f"A brittle wall at {target} collapses, revealing a rough passage."
+        )
+        return True
 
     # ------------------------------------------------------------------
     # Pathfinding utilities

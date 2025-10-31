@@ -42,7 +42,7 @@ CLI Controls / コマンド一覧
 Command | 説明
 ------- | ----
 `move <dir …>` | Move 1–2 tiles depending on current speed. Example: `move north`, `move east north`. 方向は `north`, `south`, `east`, `west` もしくは `n/s/e/w`。
-`search` | Reveal hidden items on the current tile. アイテムは見つけるだけで拾わない。
+`search` | Reveal hidden items on the current tile. 隣接する脆い壁があれば破壊アイテムで通路化。
 `take [all\|id\|index]` | Take visible items (`take all`, `take key_master`, `take 0` など)。
 `use <id\|index>` | Use an inventory item (speed boost, ghost freeze, etc.)。
 `wait` | ターンを消費して様子を見る。
@@ -57,7 +57,7 @@ Gameplay Notes / ゲームメモ
 --------------------------
 
 - **布局**: 9 rooms × 6×6 tiles. One-way passages and walls force route planning.
-- **Items**: Randomly assigned per room at start. Master key (`is_master: True`) is required to unlock the exit. Speed boosts last 4–5 turns; ghost freeze items halt ghosts and room activity for a limited duration.
+- **Items**: Randomly assigned per room at start. Master key (`is_master: True`) is required to unlock the exit. Speed boosts last 4–5 turns; ghost freeze items halt ghosts and room activity for a limited duration; wall breakers instantly collapse an adjacent brittle wall when discovered via `search`.
 - **Ghosts**: Up to two active.  
   - First ghost: 1/6 spawn chance every time player’s total steps reach multiples of 5 (outside safe rooms).  
   - Second ghost: 1/6 chance after every action once the first ghost is out (also respecting safe rooms).  
@@ -228,6 +228,7 @@ Name | Location | 説明
 `Ghost` | `haikyo_escape.entities` | 出現状態・凍結ターン・前回部屋を保持し、追跡AIに利用。
 `GameState` | `haikyo_escape.state` | ループ中の mutable state（部屋・プレイヤー・幽霊・アイテム・カウンタ類）。
 `Direction` | `haikyo_escape.types` | `N/E/S/W` のベクトルを提供する。
+`Room.fragile_walls` | `haikyo_escape.room` | 破壊可能な壁のセット。探索時に通路へ変換される。
 
 Key Variables / 主な変数
 ------------------------
@@ -254,7 +255,7 @@ Name | 役割
 `GameEngine._maybe_spawn_ghosts()` | 歩数・行動回数に応じた1/6判定で幽霊をスポーン。
 `GameEngine._move_ghosts()` | 各幽霊の移動距離をダイスで決め、最短経路で追跡させる。
 `GameState.move_player_step(direction)` | 1マス移動またはドア通過処理と壁チェックを実行。
-`GameState.reveal_items_at_player()` | 現在マスの隠しアイテムを公開しログに残す。
+`GameState.reveal_items_at_player()` | 現在マスの隠しアイテムを公開しログに残す。隣接脆弱壁と破壊アイテムで通路生成も判定。
 `GameState.freeze_room(room_id, duration)` | 部屋に凍結効果を付与し幽霊移動を停止。
 `GameState.check_victory()` | 鍵保持＋出口到達、または幽霊接触を検出してゲーム終了状態を更新。
 

@@ -101,6 +101,30 @@ class GameStateTest(unittest.TestCase):
         self.assertEqual(result, ActionResult.BLOCKED)
         self.assertEqual(state.player.position, (4, 2))
 
+    def test_search_breaks_fragile_wall_with_breaker(self) -> None:
+        state = self.make_state()
+        room = state.rooms["room_a"]
+        room.add_fragile_wall((4, 3))
+        breaker = Item(
+            item_id="breaker",
+            name="Breaker",
+            item_type=ItemType.WALL_BREAKER,
+            room_id="room_a",
+            hidden=False,
+            position=(4, 2),
+            metadata={},
+        )
+        state.add_item(breaker)
+        self.assertTrue(state.pickup_item(breaker.item_id))
+        self.assertIsNotNone(state.player.find_item_of_type(ItemType.WALL_BREAKER))
+
+        state.reveal_items_at_player()
+
+        self.assertIsNone(state.player.find_item_of_type(ItemType.WALL_BREAKER))
+        self.assertTrue(room.is_walkable((4, 3)))
+        self.assertFalse(room.is_fragile_wall((4, 3)))
+        self.assertTrue(any("brittle wall" in entry for entry in state.log))
+
 
 if __name__ == "__main__":
     unittest.main()

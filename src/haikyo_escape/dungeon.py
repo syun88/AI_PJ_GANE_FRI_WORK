@@ -79,17 +79,17 @@ def _build_rooms() -> Dict[str, Room]:
     rooms["r1"].add_wall((2, 2))
     rooms["r1"].add_wall((3, 2))
     rooms["r2"].add_wall((1, 1))
-    rooms["r2"].add_wall((4, 4))
+    rooms["r2"].add_fragile_wall((4, 4))
     rooms["r3"].add_wall((0, 2))
-    rooms["r3"].add_wall((1, 2))
+    rooms["r3"].add_fragile_wall((1, 2))
     rooms["r4"].add_wall((2, 3))
     rooms["r4"].add_wall((2, 4))
     rooms["r5"].add_wall((5, 1))
     rooms["r5"].add_wall((5, 2))
-    rooms["r6"].add_wall((3, 3))
+    rooms["r6"].add_fragile_wall((3, 3))
     rooms["r6"].add_wall((3, 4))
     rooms["r7"].add_wall((2, 1))
-    rooms["r7"].add_wall((3, 1))
+    rooms["r7"].add_fragile_wall((3, 1))
     rooms["r8"].add_wall((1, 4))
     rooms["r8"].add_wall((4, 2))
 
@@ -209,8 +209,8 @@ def _generate_items(rooms: Dict[str, Room], rng: random.Random) -> Dict[str, Ite
         ("freeze_b", "氷結スプレー", ItemType.GHOST_FREEZE, {"duration": 2}),
         ("speed_a", "アドレナリン注射", ItemType.SPEED_BOOST, {"duration": 5}),
         ("speed_b", "滑走シューズ", ItemType.SPEED_BOOST, {"duration": 4}),
+        ("breaker_a", "錆びたバール", ItemType.WALL_BREAKER, {"consumed_on_use": True}),
         ("lore_a", "旧校長の日誌", ItemType.LORE, {}),
-        ("lore_b", "謎の写真", ItemType.LORE, {}),
     ]
 
     room_ids = list(rooms.keys())
