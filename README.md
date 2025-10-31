@@ -134,42 +134,40 @@ flowchart TD
     K -- いいえ --> Z[終了処理でゲーム終了]
     K -- はい --> L[プレイヤーの行動入力]
 
-    L --> CmdMove[move コマンド: 壁やドアを確認して移動]
-    CmdMove --> MoveOutcome{移動成功?}
-    MoveOutcome -- いいえ --> MoveFail[移動失敗をログ記録]
-    MoveFail --> ActionComplete[コマンド解決済み]
-    MoveOutcome -- はい --> StepUpdate[歩数+1 と total_steps を更新]
-    StepUpdate --> VictoryCheck{出口マスか?}
+    L --> MoveCmd[move: 壁・ドア・一方通行チェック]
+    MoveCmd --> StepUpdate[歩数+1 / total_steps更新]
+    MoveCmd --> MoveBlocked[移動できずログ更新]
+    StepUpdate --> VictoryCheck{出口マス?}
+    MoveBlocked --> GhostPhaseStart[幽霊フェーズへ]
 
-    L --> CmdSearch[search コマンド: ピンク探索マスを調べる]
-    CmdSearch --> RevealItems[隠しアイテムを発見して表示]
-    RevealItems --> ActionComplete
+    L --> SearchCmd[search: ピンク探索マスを調べる]
+    SearchCmd --> RevealItems[隠しアイテムを発見・表示]
+    RevealItems --> GhostPhaseStart
 
-    L --> CmdTake[take コマンド: アイテム取得]
-    CmdTake --> InventoryAdd[インベントリに追加]
+    L --> TakeCmd[take: アイテム取得]
+    TakeCmd --> InventoryAdd[インベントリに追加]
     InventoryAdd --> VictoryCheck
 
-    L --> CmdUse[use コマンド: 加速または停止アイテムを使用]
-    CmdUse --> EffectApply[効果ターンを設定]
-    EffectApply --> EffectNotes[効果適用: 加速/凍結/通路生成など]
-    EffectNotes --> ActionComplete
+    L --> UseCmd[use: アイテム使用（加速 or 停止）]
+    UseCmd --> EffectSet[効果ターンを設定]
+    EffectSet --> EffectResult[加速中: 5ターン間2マス移動 / 幽霊停止中: 対象部屋の幽霊停止 / ぼろ壁+破壊アイテム→通路生成]
+    EffectResult --> GhostPhaseStart
 
-    L --> CmdWait[wait コマンド: 様子を見る]
-    CmdWait --> WaitLog[ログを更新]
-    WaitLog --> ActionComplete
+    L --> WaitCmd[wait: 様子を見る（ターン経過）]
+    WaitCmd --> WaitLog[ログ更新]
+    WaitLog --> GhostPhaseStart
 
-    L --> CmdInfo[look / help / quit など情報コマンド]
-    CmdInfo --> InfoProcess[情報コマンド処理]
-    InfoProcess --> ActionComplete
+    L --> InfoCmd[look / help / quit: 情報コマンド]
+    InfoCmd --> InfoProcess[情報コマンド処理]
+    InfoProcess --> GhostPhaseStart
 
     VictoryCheck -->|出口+鍵あり| GameWin[脱出成功! ゲームクリア]
     VictoryCheck -->|幽霊と同マス| GameOver[幽霊に捕獲されゲームオーバー]
-    VictoryCheck -->|それ以外| ActionComplete
+    VictoryCheck -->|それ以外| GhostPhaseStart
     GameWin --> Z
     GameOver --> Z
 
-    ActionComplete --> GhostPhase[幽霊フェーズへ]
-    GhostPhase --> SpawnCheck[幽霊の出現判定]
+    GhostPhaseStart --> SpawnCheck[幽霊の出現判定]
     SpawnCheck --> FirstSpawn[1体目: 5歩ごとに1/6]
     SpawnCheck --> SecondSpawn[2体目: アクション毎に1/6]
     SpawnCheck --> SafeRooms[安全部屋などで出現なし]
