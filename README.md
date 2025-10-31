@@ -134,57 +134,61 @@ flowchart TD
     K -- いいえ --> Z[終了処理でゲーム終了]
     K -- はい --> L[プレイヤーの行動入力]
 
-    L --> M1[情報確認: マップ / ログ / ヒント]
-    M1 --> L
+    L --> CmdMove[move コマンド: 壁やドアを確認して移動]
+    CmdMove --> MoveOutcome{移動成功?}
+    MoveOutcome -- いいえ --> MoveFail[移動失敗をログ記録]
+    MoveFail --> ActionComplete[コマンド解決済み]
+    MoveOutcome -- はい --> StepUpdate[歩数+1 と total_steps を更新]
+    StepUpdate --> VictoryCheck{出口マスか?}
 
-    L --> M2[通常移動]
-    M2 --> N1{移動可能？}
-    N1 -- いいえ --> O1[失敗としてログ記録後に継続]
-    O1 --> L
-    N1 -- はい --> P1[位置更新と総移動数の加算]
-    P1 --> Q1{探索マスに到達？}
-    Q1 -- はい --> R1[探索イベントを解決しアイテム抽選]
-    R1 --> S1{入手する？}
-    S1 -- はい --> T1[インベントリに追加]
-    S1 -- いいえ --> U1[床に残す]
-    T1 --> V1
-    U1 --> V1
-    Q1 -- いいえ --> V1[幽霊遭遇チェック]
-    V1 --> W1{幽霊と接触？}
-    W1 -- はい --> Z1[敗北でゲーム終了]
-    W1 -- いいえ --> X1[イベント/効果処理を完了]
-    X1 --> Y[ターン終了処理へ]
+    L --> CmdSearch[search コマンド: ピンク探索マスを調べる]
+    CmdSearch --> RevealItems[隠しアイテムを発見して表示]
+    RevealItems --> ActionComplete
 
-    L --> M3[探索アクション]
-    M3 --> R1
+    L --> CmdTake[take コマンド: アイテム取得]
+    CmdTake --> InventoryAdd[インベントリに追加]
+    InventoryAdd --> VictoryCheck
 
-    L --> M4[アイテム使用]
-    M4 --> N2{使用可能？}
-    N2 -- いいえ --> O1
-    N2 -- はい --> P2[効果適用: 加速や凍結など]
-    P2 --> Y
+    L --> CmdUse[use コマンド: 加速または停止アイテムを使用]
+    CmdUse --> EffectApply[効果ターンを設定]
+    EffectApply --> EffectNotes[効果適用: 加速/凍結/通路生成など]
+    EffectNotes --> ActionComplete
 
-    L --> M5[アイテム整理: 捨てる / 入れ替え]
-    M5 --> Y
+    L --> CmdWait[wait コマンド: 様子を見る]
+    CmdWait --> WaitLog[ログを更新]
+    WaitLog --> ActionComplete
 
-    L --> M6[特殊行動: 待機や聞き耳など]
-    M6 --> Y
+    L --> CmdInfo[look / help / quit など情報コマンド]
+    CmdInfo --> InfoProcess[情報コマンド処理]
+    InfoProcess --> ActionComplete
 
-    L --> M7[ドア操作・脱出行動]
-    M7 --> N3{鍵・条件を満たす？}
-    N3 -- いいえ --> O1
-    N3 -- はい --> P3[部屋遷移 or 脱出判定]
-    P3 --> W2{脱出成功？}
-    W2 -- はい --> Z2[勝利でゲーム終了]
-    W2 -- いいえ --> Y
+    VictoryCheck -->|出口+鍵あり| GameWin[脱出成功! ゲームクリア]
+    VictoryCheck -->|幽霊と同マス| GameOver[幽霊に捕獲されゲームオーバー]
+    VictoryCheck -->|それ以外| ActionComplete
+    GameWin --> Z
+    GameOver --> Z
 
-    Y --> AA[幽霊フェーズ開始]
-    AA --> AB[幽霊出現判定: 1/6など]
-    AB --> AC[幽霊移動: 凍結中は停止]
-    AC --> AD{接触した？}
-    AD -- はい --> Z1
-    AD -- いいえ --> AE[ターン終了処理: ログ整理と効果ターン減算]
-    AE --> J
+    ActionComplete --> GhostPhase[幽霊フェーズへ]
+    GhostPhase --> SpawnCheck[幽霊の出現判定]
+    SpawnCheck --> FirstSpawn[1体目: 5歩ごとに1/6]
+    SpawnCheck --> SecondSpawn[2体目: アクション毎に1/6]
+    SpawnCheck --> SafeRooms[安全部屋などで出現なし]
+    FirstSpawn --> SpawnPlacement[最遠部屋から出現]
+    SecondSpawn --> SpawnPlacement
+    SafeRooms --> FreezeCheck{幽霊は凍結中?}
+    SpawnPlacement --> FreezeCheck
+    FreezeCheck -- はい --> GhostStay[移動せず滞在]
+    FreezeCheck -- いいえ --> GhostAdvance[幽霊の移動]
+    GhostAdvance --> GhostSteps[1マス(2/3) または 2マス(1/3) 移動]
+    GhostSteps --> GhostChase[最短経路で追跡（安全部屋は回避）]
+    GhostChase --> ContactCheck[接触判定]
+    GhostStay --> ContactCheck
+    ContactCheck -->|幽霊と同マス| GameOver
+    ContactCheck -->|未接触| TurnWrap[ターン終了]
+    TurnWrap --> EffectDecay[加速・凍結ターン減算]
+    EffectDecay --> LogTurn[ログ更新 / ターン数+1]
+    LogTurn --> NextTurn[次ターンへ戻る（ループ）]
+    NextTurn --> J
 ```
 
 1. **初期化 / Setup**
@@ -194,7 +198,10 @@ flowchart TD
    - `GameState.tick_start_of_turn()` で速度・凍結などの残りターンを減算し、ログを更新。
 3. **プレイヤー入力 / Player Action**
    - CLI からコマンドを取得し `GameEngine._resolve_player_action()` で処理。
-   - 成功したアクションは `total_steps` や `action_count` に反映される。
+   - `move` は壁・ドア・一方通行の判定を行い、成功時に歩数と `total_steps` を更新。失敗はログに記録。
+   - `search` は探索マスの隠しアイテムを公開し、`take` はインベントリに追加した直後に勝利判定へ進む。
+   - `use` は加速・凍結・通路生成などの効果ターンを設定し、`wait` はターン経過としてログを更新。
+   - `look` / `help` / `quit` など情報系コマンドは状態確認やセッション終了の処理に遷移。
 4. **勝敗判定① / Victory Check (player phase)**
    - `GameState.check_victory()` が鍵＋出口到達、または幽霊接触を確認。
 5. **幽霊処理 / Ghost Phase**
