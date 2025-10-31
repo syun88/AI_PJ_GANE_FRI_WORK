@@ -155,6 +155,14 @@ class GameState:
 
         if not room.is_walkable(candidate):
             self.record("A wall blocks the way.")
+            door_positions = [
+                door.position for door in room.doors.values() if door.direction == direction
+            ]
+            if door_positions and self.player.position not in door_positions:
+                tiles = ", ".join(str(pos) for pos in door_positions)
+                self.record(
+                    f"Stand on {tiles} to use the {direction.name.lower()} door."
+                )
             return ActionResult.BLOCKED
 
         self.player.set_position(candidate)

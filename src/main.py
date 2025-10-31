@@ -16,6 +16,7 @@ from haikyo_escape.dungeon import build_default_dungeon
 from haikyo_escape.engine import GameEngine
 from haikyo_escape.entities import Ghost, Player
 from haikyo_escape.state import GameState
+from haikyo_escape.types import Direction
 
 
 def build_game_state(seed: Optional[int] = None) -> GameState:
@@ -81,9 +82,36 @@ def describe_room(state: GameState) -> None:
     print(f" Position: {state.player.position}")
     doors = ", ".join(f"{direction.name.lower()}" for direction in room.doors.keys()) or "none"
     print(f" Doors: {doors}")
+    door_tiles = ", ".join(
+        f"{direction.name.lower()} @ {door.position}"
+        for direction, door in room.doors.items()
+    ) or "none"
+    print(f" Door tiles: {door_tiles}")
     if room.explore_positions:
         explore = ", ".join(str(pos) for pos in sorted(room.explore_positions))
         print(f" Explore tiles: {explore}")
+    exit_hints = []
+    for direction in Direction:
+        door_positions = [
+            door.position for door in room.doors.values() if door.direction == direction
+        ]
+        door_here = room.door_at(state.player.position)
+        if not room.allows_exit_from(state.player.position, direction):
+            hint = "one-way blocked"
+        else:
+            dx, dy = direction.delta
+            candidate = (state.player.position[0] + dx, state.player.position[1] + dy)
+            if door_here and direction == door_here.direction:
+                hint = f"door to {door_here.target_room_id}"
+            elif room.is_walkable(candidate):
+                hint = "walkable"
+            elif door_positions:
+                positions = ", ".join(str(pos) for pos in door_positions)
+                hint = f"door at {positions}"
+            else:
+                hint = "blocked"
+        exit_hints.append(f"{direction.name.lower()}: {hint}")
+    print(" Exits from here: " + "; ".join(exit_hints))
     print(f" Movement speed: {state.player.current_speed} step(s) this turn")
 
 
