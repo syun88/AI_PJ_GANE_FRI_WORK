@@ -1,72 +1,67 @@
-Haunted Ruin Escape (Digital Prototype)
-=======================================
+廃墟からの脱出（デジタルプロトタイプ）
+==================================
 
-This repository hosts Team 7’s digital iteration of **「廃墟からの脱出」**, a turn-based escape game set inside a haunted school building. The codebase focuses on the programmable version of the rules (9 rooms, 6×6 grids, randomised items, dynamic ghost spawning) without relying on third-party libraries.
+このリポジトリはチーム7による脱出ゲーム **「廃墟からの脱出」** のデジタル検証版です。紙プロトタイプのルールを踏襲しつつ、9部屋 × 6×6グリッド、ランダムなアイテム配置、幽霊のスポーン／追跡ロジックなどを Python 標準ライブラリのみで再現しています。
 
-チーム7の脱出ゲーム「廃墟からの脱出」をデジタルで検証するためのリポジトリです。紙プロトタイプ向けの仕様をベースに、9部屋・6×6マスの迷路、ランダムなアイテム配置、幽霊の出現ルールなどをPythonで再現しています。
+ディレクトリ構成
+----------------
 
-Project Layout / プロジェクト構成
-----------------------------------
-
-- `game_rule_doc.md` – 最新のデジタル版ルールメモ。
-- `src/main.py` – CLI エントリポイント。
+- `game_rule_doc.md` – 最新のゲームデザインメモ。
+- `src/main.py` – CLI 版の実行エントリポイント。
 - `src/haikyo_escape/`
-  - `dungeon.py` – 標準レイアウトとアイテム配置ジェネレータ。
-  - `engine.py` – ターン制ループ／コマンド解釈／幽霊スポーン処理。
+  - `dungeon.py` – 標準ダンジョン配置とアイテム生成。
+  - `engine.py` – ターン制ループ、コマンド処理、幽霊スポーンの中枢ロジック。
   - `entities.py` – プレイヤー・幽霊・アイテムのデータ構造。
-  - `room.py` – 6×6マス、ドア、一方通行タイルの定義。
-  - `state.py` – ゲーム状態、移動・探索ロジック、勝敗判定。
-  - `types.py` – 方向や座標の共通型。
-- `tests/test_state.py` – コア状態の単体テスト。
+  - `room.py` – 6×6マスの部屋、壁、一方通行、脆い壁の定義。
+  - `state.py` – ゲーム状態管理と移動・探索・勝敗判定のヘルパー。
+  - `types.py` – 方向や座標などの共通型。
+- `tests/test_state.py` – `GameState` を中心とした単体テスト。
 
-Getting Started / はじめに
---------------------------
+セットアップと実行
+------------------
 
-1. **Environment / 環境**  
-   Python 3.11 以上（標準ライブラリのみ使用）
+1. **環境**  
+   Python 3.11 以上（外部ライブラリへの依存なし）。
 
-2. **Run the prototype / プロトタイプ実行**  
+2. **プロトタイプを起動**  
    ```bash
-   python src/main.py            # 利用可能なら int のシードを渡せます
-   python src/main.py 42         # 例: シード 42 で固定
+   python src/main.py        # 乱数シード未指定
+   python src/main.py 42     # 例: シード 42 を固定
    ```
 
-3. **Run tests / テスト実行**  
+3. **テストを実行**  
    ```bash
    python -m unittest discover -v
    ```
 
-CLI Controls / コマンド一覧
----------------------------
+コマンド一覧
+------------
 
-Command | 説明
+コマンド | 説明
 ------- | ----
-`move <dir …>` | Move 1–2 tiles depending on current speed. Example: `move north`, `move east north`. 方向は `north`, `south`, `east`, `west` もしくは `n/s/e/w`。
-`search` | Reveal hidden items on the current tile. 隣接する脆い壁があれば破壊アイテムで通路化。
-`take [all\|id\|index]` | Take visible items (`take all`, `take key_master`, `take 0` など)。
-`use <id\|index>` | Use an inventory item (speed boost, ghost freeze, etc.)。
-`wait` | ターンを消費して様子を見る。
+`move <dir …>` | 現在の移動速度に応じて1～2マス移動。例: `move north`, `move east north`。方向は `north/south/east/west` または `n/s/e/w`。
+`search` | 足元の探索マスを調べて隠しアイテムを公開。隣接する脆い壁があり破壊アイテムを所持していれば通路を生成。
+`take [all\|id\|index]` | 可視化されたアイテムを取得。`take all`, `take key_master`, `take 0` など。
+`use <id\|index>` | 所持品を使用（加速、幽霊停止など）。破壊アイテムは探索時に自動消費。
+`wait` | 何もせずターンを経過させる。
 `look` | 現在の部屋情報を再表示。
-`inventory` / `inv` | 所持アイテム一覧。
-`items` | 足元のアイテム一覧。
-`log` | 直近 10 行のログを表示。
-`help` | コマンド一覧を表示。
+`inventory` / `inv` | 所持アイテム一覧を表示。
+`items` | 足元に落ちているアイテムを表示。
+`log` | 直近10件のログを表示。
+`help` | コマンドヘルプを表示。
 `quit` | セッションを終了。
 
-Gameplay Notes / ゲームメモ
---------------------------
+ゲームのポイント
+----------------
 
-- **布局**: 9 rooms × 6×6 tiles. One-way passages and walls force route planning.
-- **Items**: Randomly assigned per room at start. Master key (`is_master: True`) is required to unlock the exit. Speed boosts last 4–5 turns; ghost freeze items halt ghosts and room activity for a limited duration; wall breakers instantly collapse an adjacent brittle wall when discovered via `search`.
-- **Ghosts**: Up to two active.  
-  - First ghost: 1/6 spawn chance every time player’s total steps reach multiples of 5 (outside safe rooms).  
-  - Second ghost: 1/6 chance after every action once the first ghost is out (also respecting safe rooms).  
-  - Movement: 1 tile with probability 2/3, 2 tiles with probability 1/3, chasing the player via shortest path but respecting safe zones and freezes.
-- **Victory**: Reach the exit tile with the true key.  
-  **Defeat**: Share a tile with any active ghost.
+- **マップ構造**: 9部屋・各部屋 6×6 マス。壁や一方通行、脆い壁が進路計画に影響。
+- **アイテム**: ゲーム開始時にランダム配置。真の鍵 (`is_master: True`) が出口解錠に必須。加速アイテムは4〜5ターン二歩移動、幽霊停止アイテムは部屋全体を凍結、破壊アイテムは探索時に隣接する脆い壁を崩落させる。
+- **幽霊**: 最大2体が追跡。累計歩数5刻みで1体目を1/6判定、1体目登場後は各アクションごとに2体目を1/6判定。移動は2/3で1マス、1/3で2マス、最短経路で追跡。ただし安全部屋や凍結部屋は回避。
+- **勝利条件**: 正しい鍵を所持したまま出口マスに到達。  
+  **敗北条件**: 幽霊と同じマスに入るか、幽霊が滞在するマスに突入。
 
-Example Session / サンプル
---------------------------
+サンプルプレイ
+--------------
 
 ```
 $ python src/main.py 7
@@ -99,25 +94,24 @@ Player moved to r1
 ···
 ```
 
-Development Tips / 開発メモ
--------------------------
+開発メモ
+--------
 
-- Use `build_default_dungeon` (in `dungeon.py`) to tweak room connections, item tables, or starting positions.
-- `GameState` exposes helper methods for movement, pathfinding, freezing effects, and logging—prefer using them inside new systems.
-- Ghost logic (spawn thresholds, movement rolls) is centralised in `engine.py`; adjust probabilities or rules there.
-- To reproduce runs, pass an integer seed to `python src/main.py <seed>`.
+- レイアウトやアイテム配分は `dungeon.py` の `build_default_dungeon()` を編集すると調整しやすい。
+- 移動・探索・凍結処理などは `GameState` のヘルパー経由で呼び出すと状態遷移が一貫する。
+- 幽霊の出現確率や移動ロジックは `engine.py` に集約されているため、難易度調整はここで行う。
+- シード付きで再現したい場合は `python src/main.py <seed>` を利用。
 
-Open TODOs / 今後の課題
-----------------------
+今後の課題
+----------
 
-1. Balance the default dungeon layout and ghost difficulty through playtests.
-2. Implement richer ghost AI tables or behaviours (e.g., patrols, noise attraction).
-3. Add automated simulations to verify escape probability and pacing.
-4. Replace CLI strings with structured command objects for downstream GUI work.
-5. Extend tests to cover item usage, freeze timers, and one-way tile edge cases.
+1. 
+2. 
+3. 
+4. 
 
-Flow Overview / フローチャート
-------------------------------
+進行フロー
+----------
 
 ```mermaid
 flowchart TD
@@ -193,79 +187,72 @@ flowchart TD
     NextTurn --> J
 ```
 
-1. **初期化 / Setup**
-   - `build_default_dungeon()` でレイアウト・アイテム・開始位置を生成。
-   - `GameState` を作成し、プレイヤー・幽霊・アイテムを配置。必要なら乱数シードを設定。
-2. **ターン開始 / Start of Turn**
-   - `GameState.tick_start_of_turn()` で速度・凍結などの残りターンを減算し、ログを更新。
-3. **プレイヤー入力 / Player Action**
-   - CLI からコマンドを取得し `GameEngine._resolve_player_action()` で処理。
-   - `move` は壁・ドア・一方通行の判定を行い、成功時に歩数と `total_steps` を更新。失敗はログに記録。
-   - `search` は探索マスの隠しアイテムを公開し、`take` はインベントリに追加した直後に勝利判定へ進む。
-   - `use` は加速・凍結・通路生成などの効果ターンを設定し、`wait` はターン経過としてログを更新。
-   - `look` / `help` / `quit` など情報系コマンドは状態確認やセッション終了の処理に遷移。
-4. **勝敗判定① / Victory Check (player phase)**
-   - `GameState.check_victory()` が鍵＋出口到達、または幽霊接触を確認。
-5. **幽霊処理 / Ghost Phase**
-   - `GameEngine._maybe_spawn_ghosts()` で 1/6 判定によるスポーンを実行。
-   - `GameEngine._move_ghosts()` が各幽霊の移動距離をサイコロで決定し、最短経路で追跡。
-6. **勝敗判定② / Victory Check (ghost phase)**
-   - 幽霊移動後に再度 `check_victory()` を実行し、終了条件を確認。
-7. **ループ継続 / Continue**
-   - `GameState.is_over` が `False` なら次ターンへ。終了ならログと勝者を出力して終了。
+1. **初期化**  
+   `build_default_dungeon()` で部屋・アイテム・開始地点を生成し、`GameState` に配置。必要なら乱数シードを設定。
+2. **ターン開始処理**  
+   `GameState.tick_start_of_turn()` で速度や凍結の残りターンを調整し、ログを追記。
+3. **プレイヤー行動**  
+   `GameEngine._resolve_player_action()` が CLI 入力を解釈し、移動・探索・取得・使用・待機・情報コマンドを処理。
+4. **勝敗判定（プレイヤー側）**  
+   `GameState.check_victory()` で出口到達＋鍵所持、幽霊との接触を判定。
+5. **幽霊フェーズ**  
+   `GameEngine._maybe_spawn_ghosts()` がスポーン判定、`_move_ghosts()` が最短経路移動を解決。
+6. **勝敗判定（幽霊側）**  
+   再度 `check_victory()` を呼び、捕獲や脱出を確認。
+7. **ループ継続**  
+   終了条件を満たしていなければ次ターンへ。終了時はログと勝者を出力。
 
-Data Structures / データ構造
-----------------------------
+データ構造
+----------
 
-Name | Location | 説明
----- | -------- | ----
-`DungeonSetup` | `haikyo_escape.dungeon` | 生成した部屋・アイテム・開始／出口情報をまとめたコンテナ。
-`Room` | `haikyo_escape.room` | 幅・高さ・壁・探索マス・ドアを持つ6×6マス。ドア位置も記録。
-`Door` | `haikyo_escape.room` | 接続先の部屋・ドア座標・鍵／一方通行情報を保持。
-`Item` | `haikyo_escape.entities` | アイテム種別と配置座標、メタデータ（効果ターンなど）を持つ。
-`ItemType` | `haikyo_escape.entities` | `KEY`, `DUMMY_KEY`, `GHOST_FREEZE`, `SPEED_BOOST`, `LORE` などの列挙型。
-`Player` | `haikyo_escape.entities` | 現在位置・インベントリ・速度効果ターンを追跡。
-`Ghost` | `haikyo_escape.entities` | 出現状態・凍結ターン・前回部屋を保持し、追跡AIに利用。
-`GameState` | `haikyo_escape.state` | ループ中の mutable state（部屋・プレイヤー・幽霊・アイテム・カウンタ類）。
-`Direction` | `haikyo_escape.types` | `N/E/S/W` のベクトルを提供する。
-`Room.fragile_walls` | `haikyo_escape.room` | 破壊可能な壁のセット。探索時に通路へ変換される。
+名称 | モジュール | 説明
+---- | ---------- | ----
+`DungeonSetup` | `haikyo_escape.dungeon` | 生成済みの部屋、アイテム、開始／出口情報、安全部屋をまとめたコンテナ。
+`Room` | `haikyo_escape.room` | 6×6 マスの部屋定義。壁・探索マス・ドア・脆い壁を保持。
+`Door` | `haikyo_escape.room` | 接続先、ドア座標、鍵・一方通行設定を管理。
+`Item` | `haikyo_escape.entities` | アイテム種別、設置位置、メタデータを表す。
+`ItemType` | `haikyo_escape.entities` | `KEY`、`GHOST_FREEZE`、`SPEED_BOOST`、`WALL_BREAKER` などの列挙。
+`Player` | `haikyo_escape.entities` | 現在位置、所持品、速度効果を保持。
+`Ghost` | `haikyo_escape.entities` | 出現状態、凍結ターン、直前の部屋など追跡AIに必要な情報。
+`GameState` | `haikyo_escape.state` | ゲーム全体の状態を保持し、ログやカウンタも管理。
+`Direction` | `haikyo_escape.types` | `N/E/S/W` をユーティリティベクトルとして提供。
+`Room.fragile_walls` | `haikyo_escape.room` | 破壊可能な壁の座標集合。
 
-Key Variables / 主な変数
-------------------------
+主な変数
+--------
 
-Name | 所属 | 内容
+名称 | 所属 | 内容
 ---- | ---- | ----
-`GameState.total_steps` | `haikyo_escape.state` | プレイヤーの累計移動マス数。5刻みで幽霊出現判定に使用。
-`GameState.action_count` | `haikyo_escape.state` | 実行済みアクション数。ログや将来の分析向け。
-`GameState.room_freeze_turns` | `haikyo_escape.state` | 部屋ID → 残り凍結ターンのマップ。
+`GameState.total_steps` | `haikyo_escape.state` | プレイヤーの累計移動マス数。1体目幽霊のスポーン判定に使用。
+`GameState.action_count` | `haikyo_escape.state` | 実行済みアクション数。ログや分析用カウンタ。
+`GameState.room_freeze_turns` | `haikyo_escape.state` | 部屋IDごとの凍結残りターン。
 `GameState.safe_rooms` | `haikyo_escape.state` | 幽霊が侵入しない安全エリア集合。
-`Player.speed_turns_remaining` | `haikyo_escape.entities` | 速度アップ効果の残りターン数。
+`Player.speed_turns_remaining` | `haikyo_escape.entities` | 移動速度上昇の残りターン。
 `Ghost.frozen_turns` | `haikyo_escape.entities` | 個別幽霊の凍結残りターン。
-`Ghost.is_spawned` | `haikyo_escape.entities` | まだ登場していない幽霊かどうかのフラグ。
-`GameEngine.next_first_spawn_threshold` | `haikyo_escape.engine` | 最初の幽霊出現を再判定する累積歩数しきい値。
+`Ghost.is_spawned` | `haikyo_escape.entities` | 幽霊が既に出現済みかどうか。
+`GameEngine.next_first_spawn_threshold` | `haikyo_escape.engine` | 1体目幽霊の次回スポーン阈値（累計歩数）。
 
-Key Functions / 主な関数
-------------------------
+主な関数
+--------
 
-Name | 役割
+名称 | 役割
 ---- | ----
-`build_default_dungeon(rng)` | 9部屋レイアウトとアイテム配置を生成し `DungeonSetup` を返す。
-`GameEngine.run_turn()` | 1ターン分のプレイヤー行動 → 幽霊処理 → 勝敗判定を司るメインループ。
-`GameEngine._resolve_player_action(action)` | CLI文字列を解析し `move/search/take/use/wait` などに振り分け。
-`GameEngine._maybe_spawn_ghosts()` | 歩数・行動回数に応じた1/6判定で幽霊をスポーン。
-`GameEngine._move_ghosts()` | 各幽霊の移動距離をダイスで決め、最短経路で追跡させる。
-`GameState.move_player_step(direction)` | 1マス移動またはドア通過処理と壁チェックを実行。
-`GameState.reveal_items_at_player()` | 現在マスの隠しアイテムを公開しログに残す。隣接脆弱壁と破壊アイテムで通路生成も判定。
-`GameState.freeze_room(room_id, duration)` | 部屋に凍結効果を付与し幽霊移動を停止。
-`GameState.check_victory()` | 鍵保持＋出口到達、または幽霊接触を検出してゲーム終了状態を更新。
+`build_default_dungeon(rng)` | 標準レイアウトとアイテム配置を生成して `DungeonSetup` を返す。
+`GameEngine.run_turn()` | プレイヤー行動 → 幽霊処理 → 勝敗判定を1ターン分まとめて実行。
+`GameEngine._resolve_player_action(action)` | CLI入力を解析し、`move` や `search` などに振り分け。
+`GameEngine._maybe_spawn_ghosts()` | 歩数・アクション数に応じて1/6判定で幽霊をスポーン。
+`GameEngine._move_ghosts()` | 各幽霊の移動距離を決定し、最短経路で追跡。
+`GameState.move_player_step(direction)` | 1マス移動またはドア通過処理と壁チェックを行う。
+`GameState.reveal_items_at_player()` | 隠しアイテムを公開し、破壊アイテムで脆い壁を通路化する。
+`GameState.freeze_room(room_id, duration)` | 部屋全体に凍結効果を付与。
+`GameState.check_victory()` | 鍵所持・出口到達・幽霊接触を判定し、ゲーム終了状態を更新。
 
-Team Reference / メンバー
-------------------------
+チームメモ
+---------
 
 - C0B23159 チンジュンミン
 - C0B23145 山本真之介
 - C0B23106 中島聖成
 - C0B23085 新宮 尊
 
-*Ghost movement uses randomness; expect different logs each run.*  
-*幽霊の挙動は乱数に依存するため、出力ログは毎回変化します。*
+*幽霊移動には乱数が関わるため、プレイログは毎回異なります。*
