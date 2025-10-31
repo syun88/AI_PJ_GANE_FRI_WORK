@@ -1,10 +1,7 @@
-"""
-Room layout abstractions for the digital haunted ruin escape.
-デジタル版廃墟脱出ゲーム向けの部屋レイアウト抽象化。
+"""デジタル版廃墟脱出ゲーム向けの部屋レイアウト抽象化。
 
-Each room is a grid (default 6x6) with walls, exploration points, and doors that
-link to other rooms. One-way exits and locked doors are supported so designers
-can shape maze-like experiences.
+各部屋は 6×6（デフォルト）のグリッドで構成され、壁や探索マス、他部屋へ接続するドアを持つ。
+一方通行ドアや施錠ドアにも対応し、迷路のような体験を構築できる。
 """
 
 from __future__ import annotations
@@ -17,7 +14,7 @@ from .types import Direction, Position
 
 @dataclass
 class Door:
-    """Represents a doorway on a specific tile within a room."""
+    """部屋内の特定マスにあるドアを表現する。"""
 
     target_room_id: str
     position: Position
@@ -30,7 +27,7 @@ class Door:
 
 @dataclass
 class Room:
-    """6x6 room grid containing walls, exploration tiles, and door definitions."""
+    """壁・探索マス・ドア定義を含む 6×6 の部屋グリッド。"""
 
     room_id: str
     name: str
@@ -61,7 +58,7 @@ class Room:
         self.explore_positions.add(position)
 
     def add_fragile_wall(self, position: Position) -> None:
-        """Register a wall that can later be broken to create a tunnel."""
+        """後から破壊して通路化できる壁を登録する。"""
         self.add_wall(position)
         self.fragile_walls.add(position)
 
@@ -96,7 +93,7 @@ class Room:
         return (direction.name.lower() for direction in self.doors.keys())
 
     def describe(self) -> str:
-        """Return a human-readable summary of the room, including door states."""
+        """ドア状態を含めた部屋概要を文字列で返す。"""
         door_info = ", ".join(
             f"{direction.name.lower()} -> {door.target_room_id}"
             f"{' (locked)' if door.is_locked else ''}"

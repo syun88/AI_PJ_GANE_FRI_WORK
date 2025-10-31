@@ -1,12 +1,9 @@
-"""
-Entity definitions for the haunted ruin escape prototype.
-廃墟脱出プロトタイプで利用するエンティティ定義。
+"""廃墟脱出プロトタイプで利用するエンティティ定義。
 
-The intent is to give each teammate clear extension points:
-チームメンバーが役割を分担しやすいよう、拡張ポイントを明確に用意。
-    - Player actions / プレイヤー行動
-    - Ghost AI behaviour / 幽霊のAI挙動
-    - Item interactions / アイテムの相互作用
+チームメンバーが役割を分担しやすいよう、拡張ポイントを明確に用意する。
+    - プレイヤー行動
+    - 幽霊のAI挙動
+    - アイテム同士の相互作用
 """
 
 from __future__ import annotations
@@ -19,38 +16,32 @@ from .types import Direction, Position
 
 
 class ItemType(Enum):
-    """Types of interactable items that can be placed in rooms.
-    部屋に配置できるインタラクティブなアイテム種別。
-    """
+    """部屋に配置できるインタラクティブなアイテムの種別。"""
 
     KEY = auto()
     DUMMY_KEY = auto()
     GHOST_FREEZE = auto()
     SPEED_BOOST = auto()
     WALL_BREAKER = auto()
-    LORE = auto()  # Flavor-only collectible / 収集要素（ゲーム進行には影響しない）
+    LORE = auto()  # 収集要素（ゲーム進行には影響しない）
 
 
 @dataclass
 class Item:
-    """Static representation of an item on the board.
-    盤面上に存在するアイテム情報。
-    """
+    """盤面上に存在するアイテム情報。"""
 
     item_id: str
     name: str
     item_type: ItemType
     room_id: str
-    hidden: bool = True  # TODO: decide how hidden info is revealed to the player / 隠し情報をプレイヤーにいつ公開するか決める。
+    hidden: bool = True  # TODO: 隠し情報をプレイヤーへ公開するタイミングを詰める。
     position: Optional[Position] = None
     metadata: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass
 class Entity:
-    """Base entity with a name and current room reference.
-    名前と現在いる部屋を持つ基本エンティティ。
-    """
+    """名前と現在いる部屋を持つ基本エンティティ。"""
 
     entity_id: str
     name: str
@@ -59,10 +50,8 @@ class Entity:
     position: Position = (0, 0)
 
     def move_to(self, next_room_id: str) -> None:
-        """Update the entity location.
-        エンティティの現在位置を更新する。
-        """
-        # TODO: validate that the destination room exists and is connected. / 移動先の部屋が存在し接続されているか検証する。
+        """エンティティの現在位置を更新する。"""
+        # TODO: 移動先の部屋が存在し、接続されているかを検証する。
         self.room_id = next_room_id
 
     def set_position(self, position: Position) -> None:
@@ -71,9 +60,7 @@ class Entity:
 
 @dataclass
 class Player(Entity):
-    """Player-controlled high school student.
-    プレイヤーが操作する高校生キャラクター。
-    """
+    """プレイヤーが操作する高校生キャラクター。"""
 
     inventory: list[Item] = field(default_factory=list)
     speed_turns_remaining: int = 0
@@ -86,7 +73,7 @@ class Player(Entity):
         return self.has_item_type(item_type)
 
     def take_item(self, item: Item) -> None:
-        # TODO: enforce inventory limits or action cost if required. / 必要ならインベントリ制限や行動コストを設ける。
+        # TODO: 必要に応じてインベントリ制限や行動コストを検討する。
         self.inventory.append(item)
 
     def drop_item(self, item_id: str) -> Optional[Item]:
@@ -115,18 +102,16 @@ class Player(Entity):
 
 @dataclass
 class Ghost(Entity):
-    """Ghost opponent that moves after the player.
-    プレイヤーの後に移動する幽霊キャラクター。
-    """
+    """プレイヤーの後に行動する幽霊キャラクター。"""
 
-    aggression: float = 0.5  # 0-1 scale; TODO: tune for difficulty settings / 難易度に合わせて調整する攻撃性パラメータ。
+    aggression: float = 0.5  # 0〜1のスケール。難易度調整時に調整する。
     cannot_repeat_room: bool = True
     last_room_id: Optional[str] = None
     frozen_turns: int = 0
     is_spawned: bool = False
 
     def choose_next_room(self, available_rooms: list[str]) -> Optional[str]:
-        """Deprecated room-level movement hook (kept for backward compatibility)."""
+        """部屋単位で移動先を決める旧フック（後方互換のため残置）。"""
         for room_id in available_rooms:
             if not self.cannot_repeat_room or room_id != self.last_room_id:
                 return room_id

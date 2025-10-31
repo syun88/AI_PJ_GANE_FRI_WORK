@@ -1,7 +1,4 @@
-"""
-CLI entry point for the digital haunted ruin escape prototype.
-デジタル版「廃墟からの脱出」を手軽に試せるコマンドラインエントリ。
-"""
+"""デジタル版「廃墟からの脱出」を手軽に試せるコマンドラインエントリ。"""
 
 from __future__ import annotations
 
@@ -10,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-# Ensure the `src/` directory is importable even when running as `python src/main.py`.
+# `python src/main.py` で実行した際にも `src/` ディレクトリをインポート可能にする。
 PACKAGE_ROOT = Path(__file__).resolve().parent
 if str(PACKAGE_ROOT) not in sys.path:
     sys.path.insert(0, str(PACKAGE_ROOT))
@@ -144,7 +141,7 @@ def cli_player_choice(state: GameState, player: Player) -> str:
                 print(" ", entry)
             continue
 
-        # Action commands delegate to the engine.
+        # 行動コマンドの処理はゲームエンジンに委譲する。
         return lowered
 
 

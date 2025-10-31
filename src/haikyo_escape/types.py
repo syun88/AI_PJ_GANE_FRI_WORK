@@ -1,20 +1,16 @@
-"""
-Shared typing helpers for the haunted ruin escape engine.
-共通型定義をまとめてエンジン全体で再利用できるようにする。
-"""
+"""エンジン全体で再利用する共通型定義をまとめたモジュール。"""
 
 from __future__ import annotations
 
 from enum import Enum
 from typing import Tuple
 
-# Position on a room grid (x, y). Origin is top-left and x increases to the right.
-# 部屋グリッド上の座標 (x, y)。原点は左上、x は右方向に増加する。
+# 部屋グリッド上の座標 (x, y)。原点は左上で、x は右方向に増加する。
 Position = Tuple[int, int]
 
 
 class Direction(Enum):
-    """Cardinal movement directions within a room grid."""
+    """部屋グリッド上で用いる基本方向。"""
 
     NORTH = (0, -1)
     EAST = (1, 0)

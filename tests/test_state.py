@@ -1,4 +1,4 @@
-"""Unit tests for the haunted ruin escape state helpers."""
+"""廃墟脱出ゲーム用 GameState のユニットテスト。"""
 
 import unittest
 
@@ -13,11 +13,11 @@ class GameStateTest(unittest.TestCase):
         room_a = Room(room_id="room_a", name="Room A")
         room_b = Room(room_id="room_b", name="Room B")
 
-        # Add a couple of walls to ensure collision checks behave.
+        # 壁を追加して衝突判定が正しく働くか確認できるようにする。
         room_a.add_wall((4, 1))
         room_b.add_wall((2, 4))
 
-        # Exploration tiles so items can be placed.
+        # アイテムを配置できるよう探索マスを用意する。
         room_a.add_explore_position((4, 2))
         room_b.add_explore_position((0, 2))
 

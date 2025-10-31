@@ -1,9 +1,6 @@
-"""
-Game state container and rule helpers for the haunted ruin escape.
-ゲーム全体の状態を保持し、ルール判定を行うモジュール。
+"""ゲーム全体の状態を保持し、ターン進行や判定を支援するモジュール。
 
-The intent is to keep core logic independent of presentation so that CLI, GUI,
-and automated simulations can share the same engine.
+表示層に依存しない設計とし、CLI や GUI、シミュレーションでも同じエンジンを共有できるようにする。
 """
 
 from __future__ import annotations
@@ -19,7 +16,7 @@ from .types import Direction, Position
 
 
 class TurnPhase(Enum):
-    """High-level turn phases to keep the loop explicit."""
+    """ターンの進行段階を明示するための列挙体。"""
 
     PLAYER_DECISION = auto()
     GHOST_MOVEMENT = auto()
@@ -27,7 +24,7 @@ class TurnPhase(Enum):
 
 
 class ActionResult(Enum):
-    """Outcome for player actions."""
+    """プレイヤー行動の結果を示す列挙体。"""
 
     SUCCESS = auto()
     BLOCKED = auto()
@@ -36,10 +33,7 @@ class ActionResult(Enum):
 
 @dataclass
 class GameState:
-    """
-    Tracks all mutable simulation data required by the engine.
-    エンジンが必要とする可変データをすべて保持する。
-    """
+    """エンジンが参照する可変データをすべてまとめて保持する。"""
 
     rooms: Dict[str, Room]
     player: Player
@@ -57,7 +51,7 @@ class GameState:
     log: List[str] = field(default_factory=list)
     rng_seed: Optional[int] = None
 
-    # Gameplay counters
+    # 進行状況を示すカウンタ類
     total_steps: int = 0
     action_count: int = 0
     first_ghost_spawned: bool = False
@@ -68,17 +62,17 @@ class GameState:
         if self.start_room_id:
             self.player.move_to(self.start_room_id)
         self.player.set_position(self.start_position)
-        self.player.tick_effects()  # ensure counters non-negative
+        self.player.tick_effects()  # 残りターン系のカウンタが負数にならないよう初期化する。
 
     # ------------------------------------------------------------------
-    # Logging utilities
+    # ログ記録
     # ------------------------------------------------------------------
     def record(self, message: str) -> None:
-        """Append an event to the session log."""
+        """セッションログへメッセージを追記する。"""
         self.log.append(message)
 
     # ------------------------------------------------------------------
-    # Item management
+    # アイテム管理
     # ------------------------------------------------------------------
     def add_item(self, item: Item) -> None:
         if not item.position:
@@ -102,7 +96,7 @@ class GameState:
         ]
 
     def reveal_items_at_player(self) -> list[Item]:
-        """Reveal all hidden items at the player's current tile."""
+        """プレイヤーの足元にある隠しアイテムをすべて公開する。"""
         visible = []
         for item in self.items_at_position(self.player.room_id, self.player.position, include_hidden=True):
             if item.hidden:
@@ -131,17 +125,17 @@ class GameState:
         return True
 
     def consume_item(self, item_id: str) -> None:
-        """Remove an item from the player's inventory after it is spent."""
+        """消費済みアイテムをインベントリから取り除く。"""
         consumed = self.player.drop_item(item_id)
         if consumed:
             consumed.room_id = "consumed"
             consumed.position = None
 
     # ------------------------------------------------------------------
-    # Movement
+    # 移動系処理
     # ------------------------------------------------------------------
     def move_player_step(self, direction: Direction) -> ActionResult:
-        """Attempt to move the player by one tile or through a door."""
+        """プレイヤーを1マス、もしくはドアの先へ移動させる。"""
         room = self.rooms[self.player.room_id]
         current_pos = self.player.position
 
@@ -169,7 +163,7 @@ class GameState:
         return ActionResult.SUCCESS
 
     def _move_player_through_door(self, door: Door) -> ActionResult:
-        """Handle door traversal, including locked doors."""
+        """ドア通過時の処理。施錠チェックもここで行う。"""
         if door.is_locked and not self._player_has_valid_key():
             self.record("Door is locked. Need the correct key.")
             return ActionResult.BLOCKED
@@ -189,10 +183,10 @@ class GameState:
         return False
 
     # ------------------------------------------------------------------
-    # Turn bookkeeping
+    # ターン開始時の更新
     # ------------------------------------------------------------------
     def tick_start_of_turn(self) -> None:
-        """Apply start-of-turn decay for effects."""
+        """ターン開始時に効果ターンを減衰させる。"""
         self.player.tick_effects()
         expired_rooms = []
         for room_id, remaining in self.room_freeze_turns.items():
@@ -211,7 +205,7 @@ class GameState:
         self.action_count += 1
 
     # ------------------------------------------------------------------
-    # Ghost helpers
+    # 幽霊関連ヘルパー
     # ------------------------------------------------------------------
     def active_ghosts(self) -> Iterable[Ghost]:
         return (ghost for ghost in self.ghosts if ghost.is_spawned and ghost.is_active)
@@ -227,7 +221,7 @@ class GameState:
         room = self.rooms[spawn_room_id]
         spawn_position = self._farthest_door_position(room, self.player.position)
         if spawn_position is None:
-            spawn_position = self.player.position  # fallback
+            spawn_position = self.player.position  # 最遠ドアがなければ現在位置に出現させる。
 
         ghost.is_spawned = True
         ghost.move_to(spawn_room_id)
@@ -285,7 +279,7 @@ class GameState:
         return self.room_freeze_turns.get(room_id, 0) > 0
 
     def _try_create_tunnel(self) -> bool:
-        """Break adjacent fragile walls when the player has a breaker item."""
+        """破壊アイテムを所持している場合、隣接する脆い壁を崩して通路を開く。"""
         room = self.rooms[self.player.room_id]
         if not room.fragile_walls:
             return False
@@ -313,7 +307,7 @@ class GameState:
         return True
 
     # ------------------------------------------------------------------
-    # Pathfinding utilities
+    # 経路探索用ヘルパー
     # ------------------------------------------------------------------
     def _neighbors(
         self,
@@ -328,7 +322,7 @@ class GameState:
         if door_here:
             if not for_player or (not door_here.is_locked or self._player_has_valid_key()):
                 if for_player or door_here.target_room_id not in self.safe_rooms:
-                    # Players respect door locks, ghosts ignore them.
+                    # プレイヤーは鍵の有無を確認し、幽霊は安全部屋を避ける。
                     results.append((door_here.target_room_id, door_here.target_position))
 
         for direction in Direction:
@@ -398,7 +392,7 @@ class GameState:
         return path
 
     # ------------------------------------------------------------------
-    # Victory / defeat checks
+    # 勝敗判定
     # ------------------------------------------------------------------
     def check_victory(self) -> None:
         if self.is_over:

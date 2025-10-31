@@ -1,10 +1,6 @@
-"""
-High-level package exports for the haunted ruin escape prototype.
-廃墟脱出プロトタイプ向けの主要エクスポートをまとめたモジュール。
+"""廃墟脱出プロトタイプ向けの主要エクスポートをまとめたモジュール。
 
-The package provides dataclasses for entities, room definitions,
-and a light-weight engine loop intended to be extended by the team.
-エンティティや部屋定義のデータクラス、チームで拡張する軽量エンジンを提供する。
+エンティティや部屋定義のデータクラスと、チームで拡張する軽量エンジンを提供する。
 """
 
 from .dungeon import DungeonSetup, build_default_dungeon

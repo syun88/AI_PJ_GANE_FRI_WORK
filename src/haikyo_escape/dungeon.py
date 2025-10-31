@@ -1,7 +1,4 @@
-"""
-Default dungeon layout and item distribution for the haunted ruin escape.
-廃墟脱出ゲーム向けの標準ダンジョンレイアウトとアイテム配置を定義する。
-"""
+"""廃墟脱出ゲーム向けの標準ダンジョンレイアウトとアイテム配置を定義する。"""
 
 from __future__ import annotations
 
@@ -51,7 +48,7 @@ def build_default_dungeon(rng: Optional[random.Random] = None) -> DungeonSetup:
 
 
 # ---------------------------------------------------------------------------
-# Room construction helpers
+# 部屋レイアウト生成ヘルパー
 # ---------------------------------------------------------------------------
 
 
@@ -73,7 +70,7 @@ def _build_rooms() -> Dict[str, Room]:
     make_room("r7", "貯蔵庫")
     make_room("r8", "裏口の部屋")
 
-    # Add basic walls to create simple mazes.
+    # シンプルな迷路になるよう壁を配置。
     rooms["r0"].add_wall((1, 3))
     rooms["r0"].add_wall((4, 2))
     rooms["r1"].add_wall((2, 2))
@@ -93,7 +90,7 @@ def _build_rooms() -> Dict[str, Room]:
     rooms["r8"].add_wall((1, 4))
     rooms["r8"].add_wall((4, 2))
 
-    # Exploration tiles (pink markers).
+    # 探索マス（ピンクタイルに相当）を配置。
     rooms["r0"].add_explore_position((1, 1))
     rooms["r0"].add_explore_position((4, 4))
     rooms["r1"].add_explore_position((4, 1))
@@ -109,7 +106,7 @@ def _build_rooms() -> Dict[str, Room]:
     rooms["r8"].add_explore_position((2, 1))
     rooms["r8"].add_explore_position((3, 4))
 
-    # One-way tiles (e.g., trap floors or sliding corridors)
+    # 一方通行マス（トラップ床や滑り床を想定）
     rooms["r3"].add_one_way_exit((5, 3), {Direction.SOUTH})
     rooms["r4"].add_one_way_exit((0, 5), {Direction.EAST})
     rooms["r6"].add_one_way_exit((1, 5), {Direction.NORTH})
@@ -118,7 +115,7 @@ def _build_rooms() -> Dict[str, Room]:
 
 
 def _connect_rooms(rooms: Dict[str, Room]) -> None:
-    # Utility to add bidirectional doors quickly.
+    # 双方向ドアを素早く追加するユーティリティ。
     def connect_east_west(left: Room, right: Room, *, bidirectional: bool = True) -> None:
         left.add_door(
             Direction.EAST,
@@ -196,7 +193,7 @@ def _connect_rooms(rooms: Dict[str, Room]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Item distribution
+# アイテム配置
 # ---------------------------------------------------------------------------
 
 

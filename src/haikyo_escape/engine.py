@@ -1,9 +1,6 @@
-"""
-Turn-based engine that applies the haunted ruin escape ruleset.
-廃墟からの脱出ゲームのルールを実行するターン制エンジン。
+"""廃墟からの脱出ゲームのルールを実行するターン制エンジン。
 
-The engine is presentation-agnostic: input/output is provided via callbacks so
-CLI や GUI、シミュレーションを自由に差し替えられる。
+入出力はコールバック越しに受け渡すため、CLI や GUI、シミュレーションなどへ容易に差し替えられる。
 """
 
 from __future__ import annotations
@@ -21,7 +18,7 @@ RoomRevealFunc = Callable[[GameState], None]
 
 
 class GameEngine:
-    """Coordinates player turns, ghost resolution, and win/lose checks."""
+    """プレイヤーターンと幽霊処理、勝敗判定をまとめて進行させる管理クラス。"""
 
     def __init__(
         self,
@@ -37,10 +34,10 @@ class GameEngine:
         self.next_first_spawn_threshold = 5
 
     # ------------------------------------------------------------------
-    # Public API
+    # 公開API
     # ------------------------------------------------------------------
     def run_turn(self) -> None:
-        """Execute a full player + ghost cycle."""
+        """プレイヤー行動から幽霊処理まで1ターン分の流れを実行する。"""
         if self.state.is_over:
             return
 
@@ -69,7 +66,7 @@ class GameEngine:
         self.state.check_victory()
 
     # ------------------------------------------------------------------
-    # Player actions
+    # プレイヤー行動
     # ------------------------------------------------------------------
     def _resolve_player_action(self, raw_action: str) -> bool:
         action = (raw_action or "").strip()
@@ -221,10 +218,10 @@ class GameEngine:
         return False
 
     # ------------------------------------------------------------------
-    # Ghost logic
+    # 幽霊処理
     # ------------------------------------------------------------------
     def _maybe_spawn_ghosts(self) -> None:
-        # First ghost: triggered by movement thresholds.
+        # 1体目の幽霊は歩数しきい値に達した際に判定する。
         if (
             not self.state.first_ghost_spawned
             and self.state.total_steps >= self.next_first_spawn_threshold
@@ -236,7 +233,7 @@ class GameEngine:
                     self.state.first_ghost_spawned = True
             self.next_first_spawn_threshold += 5
 
-        # Second ghost: action-based 1/6 chance per turn after first ghost appears.
+        # 2体目の幽霊は1体目出現後、各アクションごとに1/6で判定する。
         if (
             self.state.first_ghost_spawned
             and not self.state.second_ghost_spawned
@@ -262,7 +259,7 @@ class GameEngine:
             self.state.move_ghost_towards_player(ghost, steps)
 
     def _roll_ghost_steps(self) -> int:
-        # 1 step with probability 2/3, 2 steps with probability 1/3.
+        # 2/3 の確率で1マス、1/3 の確率で2マス移動する。
         return 1 if self.rng.random() < (2 / 3) else 2
 
     def _roll_one_in_six(self) -> bool:
