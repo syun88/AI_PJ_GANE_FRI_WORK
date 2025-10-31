@@ -150,8 +150,7 @@ flowchart TD
 
     L --> UseCmd[use: アイテム使用（加速 or 停止）]
     UseCmd --> EffectSet[効果ターンを設定]
-    EffectSet --> EffectResult[加速中: 5ターン間2マス移動 / 幽霊停止中: 対象部屋の幽霊停止 / ぼろ壁+破壊アイテム→通路生成]
-    EffectResult --> GhostPhaseStart
+    EffectSet --> VictoryCheck
 
     L --> WaitCmd[wait: 様子を見る（ターン経過）]
     WaitCmd --> WaitLog[ログ更新]
