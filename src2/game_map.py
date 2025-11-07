@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Iterable, Set
 from room import Room, Door
 
 Coord = Tuple[int, int]
@@ -37,11 +37,11 @@ class Map:
         return 0 <= r < self.h and 0 <= c < self.w
 
 
-    def render(self, player_pos: Coord) -> None:
-        print("\033[2J\033[H", end="")
+    def render(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> None:
         print(f"\n[Room] {self.current_room}   [Player] row={player_pos[0]}, col={player_pos[1]}")
-        for line in self.rooms[self.current_room].render_lines(player_pos):
+        for line in self.rooms[self.current_room].render_lines(player_pos, enemies=enemies):
             print(line)
+
 
 
     def apply_move(self, player_pos: Coord) -> Tuple[int, Coord]:
@@ -51,3 +51,7 @@ class Map:
             self.current_room = door.target_room
             return self.current_room, door.target_pos
         return self.current_room, player_pos
+
+    # ---- 現在/任意の部屋のドア座標取得 ----
+    def door_positions_in_room(self, room_idx: int) -> Set[Coord]:
+        return self.rooms[room_idx].door_positions()

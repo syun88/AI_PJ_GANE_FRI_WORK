@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, Iterable, Set
 
 Coord = Tuple[int, int]
 
@@ -46,7 +46,7 @@ class Room:
     def get_door(self, pos: Coord) -> Optional[Door]:
         return self._doors.get(pos)
 
-    def door_positions(self):
+    def door_positions(self) -> Set[Coord]:
         return set(self._doors.keys())
 
     def set_goal(self, pos: Coord) -> None:
@@ -61,6 +61,7 @@ class Room:
         horizontal = "+" + "+".join(["---"] * self.w) + "+"
         lines = []
         door_set = self.door_positions()
+        enemy_set = set(enemies or [])
         goal = self._goal
         obst = self._obstacles  # ← 障害物参照
 
@@ -75,6 +76,8 @@ class Room:
                     ch = "D"
                 if goal is not None and (r, c) == goal:
                     ch = "G"
+                if (r, c) in enemy_set:
+                    ch = "E"
                 if (r, c) == player_pos:
                     ch = "P"
                 row_cells.append(f" {ch} ")
