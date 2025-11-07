@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Dict, Optional, Iterable, Set
 
 Coord = Tuple[int, int]  # (row, col)
 
@@ -36,7 +36,7 @@ class Room:
     def get_door(self, pos: Coord) -> Optional[Door]:
         return self._doors.get(pos)
 
-    def door_positions(self):
+    def door_positions(self) -> Set[Coord]:
         return set(self._doors.keys())
 
     # --- ゴール操作API ---
@@ -49,11 +49,12 @@ class Room:
         return self._goal
 
     # --- 表示 ---
-    def render_lines(self, player_pos: Coord) -> list:
-        """表示用に行ごとの文字列を返す（printは呼び出し側で）。"""
+    def render_lines(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> list:
+        """表示用に行ごとの文字列を返す。表示優先度: P > E > G > D > 空白"""
         horizontal = "+" + "+".join(["---"] * self.w) + "+"
         lines = []
         door_set = self.door_positions()
+        enemy_set = set(enemies or [])
         goal = self._goal
 
         for r in range(self.h):
@@ -65,6 +66,8 @@ class Room:
                     ch = "D"
                 if goal is not None and (r, c) == goal:
                     ch = "G"
+                if (r, c) in enemy_set:
+                    ch = "E"
                 if (r, c) == player_pos:
                     ch = "P"  # プレイヤー最優先表示
                 row_cells.append(f" {ch} ")
