@@ -34,6 +34,9 @@ class Room:
     def obstacle_positions(self):
         return set(self._obstacles)
 
+    def has_obstacle(self, pos: Coord) -> bool:
+        return pos in self._obstacles
+
     # ドアまわり以下は変更しない
     def set_door(self, pos: Coord, to_room: int, to_pos: Coord) -> None:
         if not self.in_bounds(*pos):
@@ -48,6 +51,9 @@ class Room:
 
     def door_positions(self) -> Set[Coord]:
         return set(self._doors.keys())
+
+    def door_positions_to(self, target_room: int) -> Set[Coord]:
+        return {pos for pos, door in self._doors.items() if door.target_room == target_room}
 
     def set_goal(self, pos: Coord) -> None:
         if not self.in_bounds(*pos):

@@ -1,6 +1,7 @@
 import random
+from collections import deque
 from dataclasses import dataclass
-from typing import Optional, Tuple, Set, Iterable
+from typing import Optional, Tuple, Set, Iterable, List
 
 Coord = Tuple[int, int]
 
@@ -14,10 +15,8 @@ class Oni:
 class OniManager:
     """
     ・2部屋目に入って以降、プレイヤーの移動をカウント
-    ・5マスごとに 1/6 抽選で同室のドアからOni出現（1体まで）
-    ・Oniは毎ターン1～2マスで追跡。
-        - 1マス移動: 最短になる方向に1歩
-        - 2マス移動: 「同じ方向に直線で2歩まで」(方向転換しない)
+    ・5マスごとの判定で段階的に上がる確率（10→25→45→70→100%）で同室のドアからOni出現（1体まで, プレイヤーから最遠のドアを選ぶ）
+    ・Oniは毎ターン1 or 2マスで追跡し、障害物を避けた最短経路（4方向）を進む。必要ならドアを通過して隣室へ移動
     ・プレイヤーが部屋を2回移動したら追跡終了（消滅）
     """
     def __init__(self):
@@ -25,12 +24,15 @@ class OniManager:
         self.player_steps_since_enabled: int = 0
         self.oni: Optional[Oni] = None
         self.player_room_changes_since_spawn: int = 0
+        self._spawn_chances = (10, 25, 45, 70, 100)
+        self._spawn_stage = 0
 
     # ---- トリガー管理 ----
     def notify_entered_another_room_first_time(self):
         if not self.enabled_after_second_room:
             self.enabled_after_second_room = True
             self.player_steps_since_enabled = 0
+            self._spawn_stage = 0
 
     def notify_player_step(self):
         if self.enabled_after_second_room and self.oni is None:
@@ -47,6 +49,7 @@ class OniManager:
         self,
         current_room_idx: int,
         door_positions: Iterable[Coord],
+        player_pos: Coord,
     ) -> None:
         if not self.enabled_after_second_room:
             return
@@ -59,14 +62,22 @@ class OniManager:
         if not doors:
             return
 
-        if random.randint(1, 6) == 1:
-            spawn_pos = random.choice(doors)
+        spawn_threshold = self._spawn_chances[self._spawn_stage]
+        if random.randint(1, 100) <= spawn_threshold:
+            spawn_pos = max(
+                doors,
+                key=lambda pos: abs(pos[0] - player_pos[0]) + abs(pos[1] - player_pos[1]),
+            )
             self.oni = Oni(room_idx=current_room_idx, pos=spawn_pos)
             self.player_room_changes_since_spawn = 0
+            self._spawn_stage = 0
+        else:
+            self._spawn_stage = min(self._spawn_stage + 1, len(self._spawn_chances) - 1)
 
     def despawn(self):
         self.oni = None
         self.player_room_changes_since_spawn = 0
+        self._spawn_stage = 0
 
     # ---- 追跡（同室のときのみ）----
     def move_oni_toward(
@@ -74,75 +85,109 @@ class OniManager:
         current_room_idx: int,
         player_pos: Coord,
         in_bounds_fn,  # (r,c)->bool
+        door_transition_fn,  # (room_idx,pos)->(room_idx,pos)
+        door_to_room_fn,  # (room_idx,target_room)->Iterable[Coord]
+        is_blocked_fn,  # (room_idx,pos)->bool
     ) -> bool:
-        """
-        Oniが同室なら1～2歩で最短接近。
-        ・1歩: その時点で最短になる方向へ1歩
-        ・2歩: 最初に選んだ軸（縦 or 横）を固定し、同じ方向に最大2歩の直線移動
-        捕まえたら True。
-        """
-        if self.oni is None or self.oni.room_idx != current_room_idx:
+        """Oniが1or2歩進み、障害物を避けた経路でターゲットへ接近する。"""
+        if self.oni is None:
             return False
 
-        pr, pc = player_pos
-        or_, oc_ = self.oni.pos
-        steps = random.randint(1, 2)
+        steps = random.choice((1, 2))
 
-        def step_toward_axis(axis: str) -> bool:
-            """axis='r' で上下、'c' で左右に1歩だけ動く。動けたらTrue。"""
-            nonlocal or_, oc_
-            nr, nc = or_, oc_
-            if axis == 'r':
-                if pr > or_:
-                    nr = or_ + 1
-                elif pr < or_:
-                    nr = or_ - 1
-                else:
-                    return False  # 縦方向の差が無い
-            else:  # axis == 'c'
-                if pc > oc_:
-                    nc = oc_ + 1
-                elif pc < oc_:
-                    nc = oc_ - 1
-                else:
-                    return False  # 横方向の差が無い
+        for _ in range(steps):
+            if self.oni is None:
+                break
 
-            if in_bounds_fn(nr, nc):
-                or_, oc_ = nr, nc
-                self.oni.pos = (or_, oc_)
+            targets = self._target_positions_for_room(
+                oni_room=self.oni.room_idx,
+                player_room=current_room_idx,
+                player_pos=player_pos,
+                door_to_room_fn=door_to_room_fn,
+            )
+            if not targets:
+                break
+
+            next_pos = self._next_step_toward(
+                room_idx=self.oni.room_idx,
+                start=self.oni.pos,
+                targets=targets,
+                in_bounds_fn=in_bounds_fn,
+                is_blocked_fn=is_blocked_fn,
+            )
+            if next_pos is None or next_pos == self.oni.pos:
+                break
+
+            self.oni.pos = next_pos
+            new_room, new_pos = door_transition_fn(self.oni.room_idx, self.oni.pos)
+            self.oni.room_idx = new_room
+            self.oni.pos = new_pos
+
+            if self.oni.room_idx == current_room_idx and self.oni.pos == player_pos:
                 return True
-            return False
 
-        # まず軸を決定（マンハッタン距離をより縮める方を優先）
-        dr_abs = abs(pr - or_)
-        dc_abs = abs(pc - oc_)
-        primary_axis = 'r' if dr_abs >= dc_abs else 'c'
-        secondary_axis = 'c' if primary_axis == 'r' else 'r'
-
-        if steps == 1:
-            # 1歩は従来通り：主軸で動けなければ副軸で1歩
-            moved = step_toward_axis(primary_axis)
-            if not moved:
-                step_toward_axis(secondary_axis)
-        else:
-            # 2歩は「直線のみ」。まず主軸を固定。
-            axis = primary_axis
-            # 主軸に差が無ければ副軸に切り替えて、その軸で直線移動。
-            if (axis == 'r' and dr_abs == 0) or (axis == 'c' and dc_abs == 0):
-                axis = secondary_axis
-
-            for _ in range(2):
-                if self.oni.pos == player_pos:
-                    break
-                moved = step_toward_axis(axis)
-                if not moved:
-                    # 直線でこれ以上進めない場合は止まる（方向転換はしない）
-                    break
-
-        return self.oni.pos == player_pos
+        return self.oni is not None and self.oni.room_idx == current_room_idx and self.oni.pos == player_pos
 
     # ---- レンダリング補助 ----
     def enemy_positions_in_room(self, room_idx: int) -> Set[Coord]:
         if self.oni is not None and self.oni.room_idx == room_idx:
             return {self.oni.pos}
         return set()
+
+    # ---- 内部ヘルパ ----
+    def _target_positions_for_room(
+        self,
+        oni_room: int,
+        player_room: int,
+        player_pos: Coord,
+        door_to_room_fn,
+    ) -> List[Coord]:
+        if oni_room == player_room:
+            return [player_pos]
+        return list(door_to_room_fn(oni_room, player_room))
+
+    def _next_step_toward(
+        self,
+        room_idx: int,
+        start: Coord,
+        targets: Iterable[Coord],
+        in_bounds_fn,
+        is_blocked_fn,
+    ) -> Optional[Coord]:
+        target_set = set(targets)
+        if not target_set:
+            return None
+        if start in target_set:
+            return start
+
+        queue = deque([start])
+        came_from = {start: None}
+        directions = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+
+        while queue:
+            r, c = queue.popleft()
+            for dr, dc in directions:
+                nr, nc = r + dr, c + dc
+                nxt = (nr, nc)
+                if nxt in came_from:
+                    continue
+                if not in_bounds_fn(nr, nc):
+                    continue
+                if is_blocked_fn(room_idx, nxt):
+                    continue
+                came_from[nxt] = (r, c)
+                if nxt in target_set:
+                    return self._first_step_from_path(start, nxt, came_from)
+                queue.append(nxt)
+        return None
+
+    @staticmethod
+    def _first_step_from_path(
+        start: Coord,
+        target: Coord,
+        came_from: dict,
+    ) -> Coord:
+        node = target
+        while came_from.get(node) not in (None, start):
+            node = came_from[node]
+        return node
