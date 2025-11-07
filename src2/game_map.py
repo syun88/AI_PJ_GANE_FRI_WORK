@@ -33,7 +33,7 @@ class Map:
         return 0 <= r < self.h and 0 <= c < self.w
 
 
-    def render(self, player_pos: Coord) -> None:
+    def render(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> None:
         print(f"\n[Room] {self.current_room}   [Player] row={player_pos[0]}, col={player_pos[1]}")
         for line in self.rooms[self.current_room].render_lines(player_pos, enemies=enemies):
             print(line)

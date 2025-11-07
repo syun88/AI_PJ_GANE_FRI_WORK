@@ -45,11 +45,13 @@ class GameState:
         self.map.current_room = int(start.get("room", 0))
         self.player = Player(pos=tuple(start.get("pos", (0, 0))))  # type: ignore
 
+        self.oni = OniManager()
+        self.caught_by_oni: bool = False
 
         self.goal_reached: bool = False
         self._update_goal_flag() 
 
-        
+         
     def try_move(self, dr: int, dc: int) -> None:
         if self.goal_reached or self.caught_by_oni:
             return
@@ -57,7 +59,6 @@ class GameState:
         # 次座標（範囲外は無視）
         nr, nc = self.player.move_by(dr, dc)
         if not self.map.in_bounds(nr, nc):
-            return
             return
 
         tentative = (nr, nc)
@@ -72,6 +73,9 @@ class GameState:
         self.player.set_position(tentative)
         prev_room = self.map.current_room
         _, new_pos = self.map.apply_move(self.player.pos)
+        if self.map.current_room != prev_room:
+            self.oni.notify_entered_another_room_first_time()
+            self.oni.notify_player_room_changed()
         self.player.set_position(new_pos)
 
 
