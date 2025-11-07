@@ -35,6 +35,10 @@ CONFIG = {
     "rooms": 9,  # 0..8 の9部屋
     "start": {"room": 0, "pos": (5, 2)},
     "doors": make_grid_doors(h=6, w=6, grid_r=3, grid_c=3),
+    "obstacles": [
+    {"room": 0, "pos": [1,3]},
+    {"room": 2, "pos": [4,0]}
+    ],
     "goal": {"room": 8, "pos": (2, 3)},
 }
 
@@ -88,8 +92,9 @@ def read_key() -> str:
 
 def main():
     gs = GameState(CONFIG)
-    print("矢印キーで移動、Qで終了（WASDでも可）")
     gs.draw()
+
+    print("矢印キーで移動、Qで終了（WASDでも可）")
     if gs.goal_reached:
         print("\n🎉 ゴール！ゲームクリア！")
         return
@@ -109,7 +114,7 @@ def main():
         if k in key_to_move:
             dr, dc = key_to_move[k]
             gs.try_move(dr, dc)
-            print("\033[2J\033[H", end="")
+            # print("\033[2J\033[H", end="")
             gs.draw()
 
             if gs.goal_reached:

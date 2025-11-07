@@ -40,6 +40,11 @@ class GameState:
             for g in goal_cfg:
                 self.map.set_goal(int(g["room"]), tuple(g["pos"]))
 
+        for o in config.get("obstacles", []):
+            self.map.add_obstacle(
+                room_idx=int(o["room"]),
+                pos=tuple(o["pos"]),
+            )
 
         start = config.get("start", {"room": 0, "pos": (0, 0)})
         self.map.current_room = int(start.get("room", 0))
@@ -62,6 +67,9 @@ class GameState:
             return
 
         tentative = (nr, nc)
+        room = self.map.rooms[self.map.current_room]
+        if tentative in room._obstacles:
+            return
 
 
         if self.map.has_goal_at(tentative):
