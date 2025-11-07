@@ -57,7 +57,7 @@ class Room:
     def get_goal(self) -> Optional[Coord]:
         return self._goal
 
-    def render_lines(self, player_pos: Coord) -> list:
+    def render_lines(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> list:
         horizontal = "+" + "+".join(["---"] * self.w) + "+"
         lines = []
         door_set = self.door_positions()
