@@ -1,4 +1,5 @@
-from typing import Dict, Tuple, Union, List
+from typing import Dict, Tuple, Union, List, Optional
+from collections import defaultdict
 from player import Player
 from game_map import Map
 from enemy import OniManager
@@ -24,7 +25,8 @@ class GameState:
         self.map = Map(h=h, w=w, num_rooms=num_rooms)
 
 
-        for d in config.get("doors", []):
+        doors_cfg = config.get("doors", [])
+        for d in doors_cfg:
             self.map.set_door(
                 room_idx=int(d["room"]),
                 pos=tuple(d["pos"]),
@@ -40,10 +42,19 @@ class GameState:
             for g in goal_cfg:
                 self.map.set_goal(int(g["room"]), tuple(g["pos"]))
 
+        forbidden_positions = self._build_forbidden_positions(doors_cfg)
         for o in config.get("obstacles", []):
+            room_idx = int(o["room"])
+            resolved_pos = self._resolve_obstacle_position(
+                room_idx=room_idx,
+                desired_pos=tuple(o["pos"]),
+                forbidden_positions=forbidden_positions,
+            )
+            if resolved_pos is None:
+                continue
             self.map.add_obstacle(
-                room_idx=int(o["room"]),
-                pos=tuple(o["pos"]),
+                room_idx=room_idx,
+                pos=resolved_pos,
             )
 
         start = config.get("start", {"room": 0, "pos": (0, 0)})
@@ -67,8 +78,7 @@ class GameState:
             return
 
         tentative = (nr, nc)
-        room = self.map.rooms[self.map.current_room]
-        if tentative in room._obstacles:
+        if self.map.is_blocked(self.map.current_room, tentative):
             return
 
 
@@ -99,6 +109,7 @@ class GameState:
         self.oni.try_spawn_if_due(
             current_room_idx=self.map.current_room,
             door_positions=self.map.door_positions_in_room(self.map.current_room),
+            player_pos=self.player.pos,
         )
 
         # 3) 鬼の追跡移動（同室時のみ1～2歩）
@@ -106,6 +117,9 @@ class GameState:
             current_room_idx=self.map.current_room,
             player_pos=self.player.pos,
             in_bounds_fn=self.map.in_bounds,
+            door_transition_fn=self.map.resolve_door_transition,
+            door_to_room_fn=self.map.door_positions_to_room,
+            is_blocked_fn=self.map.is_blocked,
         ):
             self.caught_by_oni = True
 
@@ -116,3 +130,42 @@ class GameState:
     def draw(self) -> None:
         enemies = self.oni.enemy_positions_in_room(self.map.current_room)
         self.map.render(self.player.pos, enemies=enemies)
+
+    # ---- 障害物関連 ----
+    def _build_forbidden_positions(self, doors_cfg: List[Dict]) -> Dict[int, set]:
+        forbidden = defaultdict(set)
+        for d in doors_cfg:
+            room = int(d["room"])
+            forbidden[room].add(tuple(d["pos"]))
+            to_room = int(d["to_room"])
+            forbidden[to_room].add(tuple(d["to_pos"]))
+        return forbidden
+
+    def _resolve_obstacle_position(
+        self,
+        room_idx: int,
+        desired_pos: Coord,
+        forbidden_positions: Dict[int, set],
+    ) -> Optional[Coord]:
+        room = self.map.rooms[room_idx]
+        forbidden = forbidden_positions.get(room_idx, set())
+        if desired_pos not in forbidden and not room.has_obstacle(desired_pos):
+            return desired_pos
+        return self._find_alternative_obstacle_pos(room_idx, forbidden_positions)
+
+    def _find_alternative_obstacle_pos(
+        self,
+        room_idx: int,
+        forbidden_positions: Dict[int, set],
+    ) -> Optional[Coord]:
+        room = self.map.rooms[room_idx]
+        forbidden = forbidden_positions.get(room_idx, set())
+        for r in range(self.map.h):
+            for c in range(self.map.w):
+                candidate = (r, c)
+                if candidate in forbidden:
+                    continue
+                if room.has_obstacle(candidate):
+                    continue
+                return candidate
+        return None

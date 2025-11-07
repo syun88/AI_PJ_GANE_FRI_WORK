@@ -36,6 +36,9 @@ class Map:
     def in_bounds(self, r: int, c: int) -> bool:
         return 0 <= r < self.h and 0 <= c < self.w
 
+    def is_blocked(self, room_idx: int, pos: Coord) -> bool:
+        return self.rooms[room_idx].has_obstacle(pos)
+
 
     def render(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> None:
         print(f"\n[Room] {self.current_room}   [Player] row={player_pos[0]}, col={player_pos[1]}")
@@ -52,6 +55,15 @@ class Map:
             return self.current_room, door.target_pos
         return self.current_room, player_pos
 
+    def resolve_door_transition(self, room_idx: int, pos: Coord) -> Tuple[int, Coord]:
+        door = self.rooms[room_idx].get_door(pos)
+        if door:
+            return door.target_room, door.target_pos
+        return room_idx, pos
+
     # ---- 現在/任意の部屋のドア座標取得 ----
     def door_positions_in_room(self, room_idx: int) -> Set[Coord]:
         return self.rooms[room_idx].door_positions()
+
+    def door_positions_to_room(self, room_idx: int, target_room: int) -> Set[Coord]:
+        return self.rooms[room_idx].door_positions_to(target_room)
