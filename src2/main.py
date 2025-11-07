@@ -2,6 +2,14 @@ import sys
 from gamestate import GameState
 
 def make_grid_doors(h=6, w=6, grid_r=3, grid_c=3):
+    """
+    grid_r×grid_c の部屋を 0..N-1 で並べ、左右・上下の隣接を双方向ドアで自動配線。
+    ドア位置:
+      左端   (row_mid, 0)     → 入室後 (row_mid, 1)
+      右端   (row_mid, w-1)   → 入室後 (row_mid, w-2)
+      上端   (0, col_mid)     → 入室後 (1, col_mid)
+      下端   (h-1, col_mid)   → 入室後 (h-2, col_mid)
+    """
     def idx(r, c): return r * grid_c + c
     row_mid = (h - 1) // 2  
     col_mid = w // 2         
@@ -24,7 +32,7 @@ def make_grid_doors(h=6, w=6, grid_r=3, grid_c=3):
 
 CONFIG = {
     "room_size": (6, 6),
-    "rooms": 9,
+    "rooms": 9,  # 0..8 の9部屋
     "start": {"room": 0, "pos": (5, 2)},
     "doors": make_grid_doors(h=6, w=6, grid_r=3, grid_c=3),
     "goal": {"room": 8, "pos": (2, 3)},
@@ -87,14 +95,10 @@ def main():
         return
 
     key_to_move = {
-        "up": (-1, 0),
-        "down": (1, 0),
-        "left": (0, -1),
-        "right": (0, 1),
-        "w": (-1, 0),
-        "s": (1, 0),
-        "a": (0, -1),
-        "d": (0, 1),
+        "up": (-1, 0), "down": (1, 0),
+        "left": (0, -1), "right": (0, 1),
+        "w": (-1, 0), "s": (1, 0),
+        "a": (0, -1), "d": (0, 1),
     }
 
     while True:
@@ -110,6 +114,9 @@ def main():
 
             if gs.goal_reached:
                 print("\n🎉 ゴール！ゲームクリア！")
+                break
+            if gs.caught_by_oni:
+                print("\n💀 鬼に捕まりました…ゲームオーバー")
                 break
 
 

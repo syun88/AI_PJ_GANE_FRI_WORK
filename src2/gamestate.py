@@ -1,6 +1,7 @@
 from typing import Dict, Tuple, Union, List
 from player import Player
 from game_map import Map
+from enemy import OniManager
 
 Coord = Tuple[int, int]
 
@@ -50,8 +51,13 @@ class GameState:
 
         
     def try_move(self, dr: int, dc: int) -> None:
+        if self.goal_reached or self.caught_by_oni:
+            return
+
+        # 次座標（範囲外は無視）
         nr, nc = self.player.move_by(dr, dc)
         if not self.map.in_bounds(nr, nc):
+            return
             return
 
         tentative = (nr, nc)
@@ -64,14 +70,37 @@ class GameState:
 
 
         self.player.set_position(tentative)
+        prev_room = self.map.current_room
         _, new_pos = self.map.apply_move(self.player.pos)
         self.player.set_position(new_pos)
 
 
         self._update_goal_flag()
+        if self.goal_reached:
+            return
+
+        # ここから鬼の処理
+        # 1) プレイヤー歩数カウント（5マス抽選のため）
+        self.oni.notify_player_step()
+
+        # 2) 抽選タイミングなら出現試行（同室のドアから）
+        self.oni.try_spawn_if_due(
+            current_room_idx=self.map.current_room,
+            door_positions=self.map.door_positions_in_room(self.map.current_room),
+        )
+
+        # 3) 鬼の追跡移動（同室時のみ1～2歩）
+        if self.oni.move_oni_toward(
+            current_room_idx=self.map.current_room,
+            player_pos=self.player.pos,
+            in_bounds_fn=self.map.in_bounds,
+        ):
+            self.caught_by_oni = True
+
     def _update_goal_flag(self) -> None:
         self.goal_reached = self.map.has_goal_at(self.player.pos)
 
 
     def draw(self) -> None:
-        self.map.render(self.player.pos)
+        enemies = self.oni.enemy_positions_in_room(self.map.current_room)
+        self.map.render(self.player.pos, enemies=enemies)
