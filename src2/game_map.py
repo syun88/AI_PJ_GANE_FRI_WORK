@@ -1,4 +1,4 @@
-from typing import List, Tuple, Optional, Iterable, Set
+from typing import List, Tuple, Optional, Iterable, Set, Dict
 from room import Room, Door
 
 Coord = Tuple[int, int]
@@ -40,9 +40,18 @@ class Map:
         return self.rooms[room_idx].has_obstacle(pos)
 
 
-    def render(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> None:
+    def render(
+        self,
+        player_pos: Coord,
+        enemies: Optional[Iterable[Coord]] = None,
+        items: Optional[Dict[Coord, str]] = None,
+    ) -> None:
         print(f"\n[Room] {self.current_room}   [Player] row={player_pos[0]}, col={player_pos[1]}")
-        for line in self.rooms[self.current_room].render_lines(player_pos, enemies=enemies):
+        for line in self.rooms[self.current_room].render_lines(
+            player_pos,
+            enemies=enemies,
+            items=items,
+        ):
             print(line)
 
 
