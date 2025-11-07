@@ -27,6 +27,10 @@ class Map:
     def has_goal_at(self, pos: Coord) -> bool:
         goal = self.rooms[self.current_room].get_goal()
         return goal is not None and goal == pos
+    
+    def add_obstacle(self, room_idx: int, pos: Coord) -> None:
+        self.rooms[room_idx].add_obstacle(pos)
+
 
 
     def in_bounds(self, r: int, c: int) -> bool:
@@ -34,6 +38,7 @@ class Map:
 
 
     def render(self, player_pos: Coord) -> None:
+        print("\033[2J\033[H", end="")
         print(f"\n[Room] {self.current_room}   [Player] row={player_pos[0]}, col={player_pos[1]}")
         for line in self.rooms[self.current_room].render_lines(player_pos):
             print(line)
