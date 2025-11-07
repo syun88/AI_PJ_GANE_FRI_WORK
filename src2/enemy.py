@@ -93,7 +93,8 @@ class OniManager:
         if self.oni is None:
             return False
 
-        steps = random.choice((1, 2))
+        # 1歩:2歩 = 3:1（75% / 25%）
+        steps = 1 if random.random() < 0.75 else 2
 
         for _ in range(steps):
             if self.oni is None:

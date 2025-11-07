@@ -63,13 +63,19 @@ class Room:
     def get_goal(self) -> Optional[Coord]:
         return self._goal
 
-    def render_lines(self, player_pos: Coord, enemies: Optional[Iterable[Coord]] = None) -> list:
+    def render_lines(
+        self,
+        player_pos: Coord,
+        enemies: Optional[Iterable[Coord]] = None,
+        items: Optional[Dict[Coord, str]] = None,
+    ) -> list:
         horizontal = "+" + "+".join(["---"] * self.w) + "+"
         lines = []
         door_set = self.door_positions()
         enemy_set = set(enemies or [])
         goal = self._goal
         obst = self._obstacles  # ← 障害物参照
+        item_map = items or {}
 
         for r in range(self.h):
             lines.append(horizontal)
@@ -82,6 +88,8 @@ class Room:
                     ch = "D"
                 if goal is not None and (r, c) == goal:
                     ch = "G"
+                if (r, c) in item_map:
+                    ch = item_map[(r, c)]
                 if (r, c) in enemy_set:
                     ch = "E"
                 if (r, c) == player_pos:

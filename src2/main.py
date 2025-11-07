@@ -35,6 +35,27 @@ CONFIG = {
     "rooms": 16,  # 0..15 の16部屋
     "start": {"room": 0, "pos": (9, 14)},
     "doors": make_grid_doors(h=10, w=30, grid_r=4, grid_c=4),
+    "key_spots": [
+        {"room": 2, "pos": (5, 22)},
+        {"room": 5, "pos": (7, 12)},
+        {"room": 7, "pos": (3, 18)},
+        {"room": 9, "pos": (6, 8)},
+        {"room": 11, "pos": (4, 18)},
+        {"room": 14, "pos": (5, 6)},
+        {"room": 15, "pos": (3, 14)},
+    ],
+    "key_decoy_spots": [
+        {"room": 0, "pos": (1, 15)},
+        {"room": 1, "pos": (6, 18)},
+        {"room": 3, "pos": (7, 12)},
+        {"room": 4, "pos": (2, 22)},
+        {"room": 6, "pos": (5, 8)},
+        {"room": 8, "pos": (2, 18)},
+        {"room": 10, "pos": (6, 6)},
+        {"room": 12, "pos": (7, 4)},
+        {"room": 13, "pos": (3, 18)},
+        {"room": 15, "pos": (5, 4)},
+    ],
     "obstacles": [
         # room 0
         {"room": 0, "pos": (2, 5)},
