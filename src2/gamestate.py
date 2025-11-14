@@ -114,7 +114,7 @@ class GameState:
         _, new_pos = self.map.apply_move(self.player.pos)
         if self.map.current_room != prev_room:
             self.oni.notify_entered_another_room_first_time()
-            self.oni.notify_player_room_changed()
+            self.oni.notify_player_room_changed(self.map.current_room)
         self.player.set_position(new_pos)
 
         self._notify_question_tile_if_needed()

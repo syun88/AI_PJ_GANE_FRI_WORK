@@ -23,9 +23,10 @@ class OniManager:
         self.enabled_after_second_room: bool = False
         self.player_steps_since_enabled: int = 0
         self.oni: Optional[Oni] = None
-        self.player_room_changes_since_spawn: int = 0
         self._spawn_chances = (10, 25, 45, 70, 100)
         self._spawn_stage = 0
+        self._player_rooms_since_spawn: Set[int] = set()
+        self._player_room_at_spawn: Optional[int] = None
 
     # ---- トリガー管理 ----
     def notify_entered_another_room_first_time(self):
@@ -38,10 +39,13 @@ class OniManager:
         if self.enabled_after_second_room and self.oni is None:
             self.player_steps_since_enabled += 1
 
-    def notify_player_room_changed(self):
+    def notify_player_room_changed(self, new_room_idx: int):
         if self.oni is not None:
-            self.player_room_changes_since_spawn += 1
-            if self.player_room_changes_since_spawn >= 2:
+            if self._player_room_at_spawn is None:
+                self._player_room_at_spawn = self.oni.room_idx
+            if new_room_idx != self._player_room_at_spawn:
+                self._player_rooms_since_spawn.add(new_room_idx)
+            if len(self._player_rooms_since_spawn) >= 2:
                 self.despawn()
 
     # ---- 出現/消滅 ----
@@ -69,15 +73,17 @@ class OniManager:
                 key=lambda pos: abs(pos[0] - player_pos[0]) + abs(pos[1] - player_pos[1]),
             )
             self.oni = Oni(room_idx=current_room_idx, pos=spawn_pos)
-            self.player_room_changes_since_spawn = 0
             self._spawn_stage = 0
+            self._player_rooms_since_spawn.clear()
+            self._player_room_at_spawn = current_room_idx
         else:
             self._spawn_stage = min(self._spawn_stage + 1, len(self._spawn_chances) - 1)
 
     def despawn(self):
         self.oni = None
-        self.player_room_changes_since_spawn = 0
         self._spawn_stage = 0
+        self._player_rooms_since_spawn.clear()
+        self._player_room_at_spawn = None
 
     # ---- 追跡（同室のときのみ）----
     def move_oni_toward(
