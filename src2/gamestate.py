@@ -1,9 +1,11 @@
 import random
-from typing import Dict, Tuple, Union, List, Optional, Set
+from pathlib import Path
+from typing import Dict, Tuple, Union, List, Optional, Set, Literal
 from collections import defaultdict
 from player import Player
 from game_map import Map
 from enemy import OniManager
+
 
 Coord = Tuple[int, int]
 
@@ -24,6 +26,8 @@ class GameState:
 
 
         self.map = Map(h=h, w=w, num_rooms=num_rooms)
+        self._explanation_path = Path(__file__).resolve().parent.parent / "src" / "説明.txt"
+        self._pending_messages: List[str] = []
 
 
         doors_cfg = config.get("doors", [])
@@ -113,6 +117,8 @@ class GameState:
             self.oni.notify_player_room_changed()
         self.player.set_position(new_pos)
 
+        self._notify_question_tile_if_needed()
+
         self._check_key_pickup()
         self._check_decoy_tile()
 
@@ -150,6 +156,23 @@ class GameState:
         enemies = self.oni.enemy_positions_in_room(self.map.current_room)
         items = self._items_in_current_room()
         self.map.render(self.player.pos, enemies=enemies, items=items)
+        self._print_explanation_text()
+
+    def consume_pending_messages(self) -> List[str]:
+        messages = self._pending_messages[:]
+        self._pending_messages.clear()
+        return messages
+
+    def _print_explanation_text(self) -> None:
+        try:
+            text = self._explanation_path.read_text(encoding="utf-8")
+        except OSError:
+            return
+        stripped = text.rstrip("\n")
+        if not stripped:
+            return
+        print()
+        print(stripped)
 
     # ---- 障害物関連 ----
     def _build_forbidden_positions(self, doors_cfg: List[Dict]) -> Dict[int, set]:
@@ -198,7 +221,7 @@ class GameState:
         if key_room == self.map.current_room and key_pos == self.player.pos:
             self.player.obtain_key()
             self._key_location = None
-            print("🔑 鍵を手に入れた！")
+            self._queue_message("🔑 鍵を手に入れた！")
 
     def _notify_key_requirement_if_needed(self) -> None:
         if self.player.has_key:
@@ -226,4 +249,24 @@ class GameState:
             return
         if self.player.pos in decoys:
             decoys.remove(self.player.pos)
-            print("ここには鍵が落ちていなかった…")
+            self._queue_message("ここには鍵が落ちていなかった…")
+
+    def _notify_question_tile_if_needed(self) -> None:
+        tile_type = self._question_tile_type(self.map.current_room, self.player.pos)
+        if tile_type == "key":
+            self._queue_message("？マスから本物の鍵の気配がする…！")
+        elif tile_type == "decoy":
+            self._queue_message("？マスだが、鍵は見当たらなかった…。")
+
+    def _question_tile_type(self, room_idx: int, pos: Coord) -> Optional[Literal["key", "decoy"]]:
+        if self._key_location and not self.player.has_key:
+            key_room, key_pos = self._key_location
+            if key_room == room_idx and key_pos == pos:
+                return "key"
+        decoys = self._decoy_positions.get(room_idx)
+        if decoys and pos in decoys:
+            return "decoy"
+        return None
+
+    def _queue_message(self, message: str) -> None:
+        self._pending_messages.append(message)

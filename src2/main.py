@@ -1,5 +1,7 @@
+import os
 import sys
 from gamestate import GameState
+
 
 def make_grid_doors(h=6, w=6, grid_r=3, grid_c=3):
     """
@@ -365,9 +367,19 @@ def read_key() -> str:
             termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
+def clear_screen() -> None:
+    if os.name == "nt":
+        os.system("cls")
+    else:
+        print("\033[2J\033[H", end="", flush=True)
+
+
 def main():
     gs = GameState(CONFIG)
+    clear_screen()
     gs.draw()
+    for msg in gs.consume_pending_messages():
+        print(msg)
 
     print("矢印キーで移動、Qで終了（WASDでも可）")
     if gs.goal_reached:
@@ -388,9 +400,11 @@ def main():
             break
         if k in key_to_move:
             dr, dc = key_to_move[k]
+            clear_screen()
             gs.try_move(dr, dc)
-            # print("\033[2J\033[H", end="")
             gs.draw()
+            for msg in gs.consume_pending_messages():
+                print(msg)
 
             if gs.goal_reached:
                 print("\n🎉 ゴール！ゲームクリア！")
