@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from typing import Tuple, Dict, Optional, Iterable, Set
+import unicodedata
 
 Coord = Tuple[int, int]
 
@@ -12,6 +13,7 @@ class Door:
 
 
 class Room:
+    CELL_WIDTH = 4
     def __init__(self, h: int, w: int):
         self.h = h
         self.w = w
@@ -68,8 +70,9 @@ class Room:
         player_pos: Coord,
         enemies: Optional[Iterable[Coord]] = None,
         items: Optional[Dict[Coord, str]] = None,
+        use_color: bool = False,
     ) -> list:
-        horizontal = "+" + "+".join(["---"] * self.w) + "+"
+        horizontal = "+" + "+".join(["-" * self.CELL_WIDTH] * self.w) + "+"
         lines = []
         door_set = self.door_positions()
         enemy_set = set(enemies or [])
@@ -89,12 +92,46 @@ class Room:
                 if goal is not None and (r, c) == goal:
                     ch = "G"
                 if (r, c) in item_map:
-                    ch = item_map[(r, c)]
+                    ch = "？"
                 if (r, c) in enemy_set:
-                    ch = "E"
+                    ch = "鬼"
                 if (r, c) == player_pos:
-                    ch = "P"
-                row_cells.append(f" {ch} ")
+                    ch = "人"
+                row_cells.append(self._format_cell(ch, use_color))
             lines.append("|" + "|".join(row_cells) + "|")
         lines.append(horizontal)
         return lines
+
+    def _format_cell(self, ch: str, use_color: bool) -> str:
+        colored = self._colorize_cell(ch, use_color)
+        width = self._char_width(ch)
+        padding = max(self.CELL_WIDTH - width, 0)
+        left = padding // 2
+        right = padding - left
+        return f"{' ' * left}{colored}{' ' * right}"
+
+    @staticmethod
+    def _colorize_cell(ch: str, use_color: bool) -> str:
+        if not use_color:
+            return ch
+        color_map = {
+            "人": "\033[1;36m",
+            "鬼": "\033[1;31m",
+            "？": "\033[1;33m",
+            "#": "\033[90m",
+            "D": "\033[32m",
+            "G": "\033[1;33m",
+        }
+        reset = "\033[0m"
+        prefix = color_map.get(ch)
+        if not prefix:
+            return ch
+        return f"{prefix}{ch}{reset}"
+
+    @staticmethod
+    def _char_width(ch: str) -> int:
+        if not ch:
+            return 0
+        if unicodedata.east_asian_width(ch[0]) in {"F", "W"}:
+            return 2
+        return 1

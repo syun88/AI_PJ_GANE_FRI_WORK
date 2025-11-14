@@ -1,3 +1,5 @@
+import os
+import sys
 from typing import List, Tuple, Optional, Iterable, Set, Dict
 from room import Room, Door
 
@@ -10,6 +12,7 @@ class Map:
         self.w = w
         self.rooms: List[Room] = [Room(h, w) for _ in range(num_rooms)]
         self.current_room: int = 0
+        self._use_color = sys.stdout.isatty() and os.getenv("NO_COLOR") is None
 
 
     def set_door(self, room_idx: int, pos: Coord, to_room: int, to_pos: Coord) -> None:
@@ -51,6 +54,7 @@ class Map:
             player_pos,
             enemies=enemies,
             items=items,
+            use_color=self._use_color,
         ):
             print(line)
 

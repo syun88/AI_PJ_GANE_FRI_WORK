@@ -157,6 +157,7 @@ class GameState:
         items = self._items_in_current_room()
         self.map.render(self.player.pos, enemies=enemies, items=items)
         self._print_explanation_text()
+        self._print_key_status()
 
     def consume_pending_messages(self) -> List[str]:
         messages = self._pending_messages[:]
@@ -173,6 +174,11 @@ class GameState:
             return
         print()
         print(stripped)
+
+    def _print_key_status(self) -> None:
+        if not self.player.has_key:
+            return
+        print("\n[Status] 🔑 鍵を所持している！")
 
     # ---- 障害物関連 ----
     def _build_forbidden_positions(self, doors_cfg: List[Dict]) -> Dict[int, set]:
@@ -235,12 +241,12 @@ class GameState:
         if self._key_location is not None and not self.player.has_key:
             key_room, key_pos = self._key_location
             if key_room == self.map.current_room:
-                items[key_pos] = "?"
+                items[key_pos] = "？"
 
         decoys = self._decoy_positions.get(self.map.current_room, set())
         for pos in decoys:
             if pos not in items:
-                items[pos] = "?"
+                items[pos] = "？"
         return items
 
     def _check_decoy_tile(self) -> None:
