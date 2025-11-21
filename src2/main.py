@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import Optional, Set, Tuple
 from gamestate import GameState
 
 
@@ -31,12 +32,79 @@ def make_grid_doors(h=6, w=6, grid_r=3, grid_c=3):
     return doors
 
 
+def corner_room_indices(rows: int, cols: int) -> list[int]:
+    """Return room indices for the four grid corners."""
+    indices = [
+        0,
+        cols - 1,
+        (rows - 1) * cols,
+        rows * cols - 1,
+    ]
+    return indices
+
+
+def generate_extra_obstacles(
+    num_rooms: int,
+    room_h: int,
+    room_w: int,
+    forbidden_coords: Optional[Set[Tuple[int, int, int]]] = None,
+) -> list[dict]:
+    """
+    Add extra obstacles using multiple patterns (center pillars + ring + scatter)
+    to densify each room while keeping some paths open.
+    """
+    extras: list[dict] = []
+    center_pattern = [(-1, -2), (-1, 2), (0, -3), (0, 3), (1, -2), (1, 2), (0, 0)]
+    ring_pattern = [(-3, -3), (-3, 3), (3, -3), (3, 3), (0, -5), (0, 5)]
+    scatter_pattern = [(-4, -1), (-4, 1), (4, -1), (4, 1), (-2, -4), (-2, 4), (2, -4), (2, 4)]
+    trimmed_scatter_pattern = scatter_pattern[::2]
+
+    for room_idx in range(num_rooms):
+        mid_r = max(2, min(room_h - 3, room_h // 2))
+        mid_c = max(4, min(room_w - 5, room_w // 2))
+        for pattern in (center_pattern, ring_pattern, trimmed_scatter_pattern):
+            for dr, dc in pattern:
+                rr = mid_r + dr
+                cc = mid_c + dc
+                if 0 <= rr < room_h and 0 <= cc < room_w:
+                    if forbidden_coords and (room_idx, rr, cc) in forbidden_coords:
+                        continue
+                    extras.append({"room": room_idx, "pos": (rr, cc)})
+    return extras
+
+
+GRID_ROWS = 4
+GRID_COLS = 4
+ROOM_HEIGHT = 10
+ROOM_WIDTH = 30
+START_ROOM = 0
+START_POS = (9, 14)
+GOAL_POS = (5, 15)
+
+corner_rooms = corner_room_indices(GRID_ROWS, GRID_COLS)
+goal_rooms = [idx for idx in corner_rooms if idx != START_ROOM]
+NUM_ROOMS = GRID_ROWS * GRID_COLS
+
+DOORS = make_grid_doors(h=ROOM_HEIGHT, w=ROOM_WIDTH, grid_r=GRID_ROWS, grid_c=GRID_COLS)
+goal_forbidden = {(room_idx, GOAL_POS[0], GOAL_POS[1]) for room_idx in goal_rooms}
+door_forbidden = {(int(d["room"]), d["pos"][0], d["pos"][1]) for d in DOORS}
+door_forbidden |= {(int(d["to_room"]), d["to_pos"][0], d["to_pos"][1]) for d in DOORS}
+start_forbidden = {(START_ROOM, START_POS[0], START_POS[1])}
+EXTRA_FORBIDDEN = goal_forbidden | door_forbidden | start_forbidden
+EXTRA_OBSTACLES = generate_extra_obstacles(
+    NUM_ROOMS,
+    ROOM_HEIGHT,
+    ROOM_WIDTH,
+    forbidden_coords=EXTRA_FORBIDDEN,
+)
+
 
 CONFIG = {
-    "room_size": (10, 30),
-    "rooms": 16,  # 0..15 の16部屋
-    "start": {"room": 0, "pos": (9, 14)},
-    "doors": make_grid_doors(h=10, w=30, grid_r=4, grid_c=4),
+    "room_size": (ROOM_HEIGHT, ROOM_WIDTH),
+    "rooms": NUM_ROOMS,
+    "required_keys": 3,
+    "start": {"room": START_ROOM, "pos": START_POS},
+    "doors": DOORS,
     "key_spots": [
         {"room": 2, "pos": (5, 22)},
         {"room": 5, "pos": (7, 12)},
@@ -45,6 +113,14 @@ CONFIG = {
         {"room": 11, "pos": (4, 18)},
         {"room": 14, "pos": (5, 6)},
         {"room": 15, "pos": (3, 14)},
+        {"room": 1, "pos": (7, 6)},
+        {"room": 3, "pos": (5, 21)},
+        {"room": 4, "pos": (3, 20)},
+        {"room": 6, "pos": (2, 24)},
+        {"room": 8, "pos": (6, 10)},
+        {"room": 10, "pos": (4, 18)},
+        {"room": 12, "pos": (5, 6)},
+        {"room": 13, "pos": (2, 24)},
     ],
     "key_decoy_spots": [
         {"room": 0, "pos": (1, 15)},
@@ -57,6 +133,16 @@ CONFIG = {
         {"room": 12, "pos": (7, 4)},
         {"room": 13, "pos": (3, 18)},
         {"room": 15, "pos": (5, 4)},
+        {"room": 2, "pos": (4, 12)},
+        {"room": 5, "pos": (6, 20)},
+        {"room": 7, "pos": (2, 8)},
+        {"room": 9, "pos": (3, 16)},
+        {"room": 11, "pos": (5, 10)},
+        {"room": 14, "pos": (2, 4)},
+        {"room": 6, "pos": (8, 4)},
+        {"room": 4, "pos": (6, 6)},
+        {"room": 8, "pos": (5, 20)},
+        {"room": 10, "pos": (3, 24)},
     ],
     "obstacles": [
         # room 0
@@ -315,8 +401,11 @@ CONFIG = {
         {"room": 15, "pos": (4, 18)},
         {"room": 15, "pos": (4, 19)},
         {"room": 15, "pos": (5, 19)},
+    ] + EXTRA_OBSTACLES,
+    "goal_candidates": [
+        {"room": room_idx, "pos": GOAL_POS}
+        for room_idx in goal_rooms
     ],
-    "goal": {"room": 15, "pos": (5, 15)},
 }
 
 def read_key() -> str:

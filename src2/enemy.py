@@ -19,6 +19,8 @@ class OniManager:
     ・Oniは毎ターン1 or 2マスで追跡し、障害物を避けた最短経路（4方向）を進む。必要ならドアを通過して隣室へ移動
     ・プレイヤーが部屋を2回移動したら追跡終了（消滅）
     """
+    TWO_STEP_PROBABILITY = 0.25  # 2歩行動の確率
+
     def __init__(self):
         self.enabled_after_second_room: bool = False
         self.player_steps_since_enabled: int = 0
@@ -100,7 +102,7 @@ class OniManager:
             return False
 
         # 1歩:2歩 = 3:1（75% / 25%）
-        steps = 1 if random.random() < 0.75 else 2
+        steps = 2 if random.random() < self.TWO_STEP_PROBABILITY else 1
 
         for _ in range(steps):
             if self.oni is None:

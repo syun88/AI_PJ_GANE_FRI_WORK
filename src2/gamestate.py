@@ -28,6 +28,9 @@ class GameState:
         self.map = Map(h=h, w=w, num_rooms=num_rooms)
         self._explanation_path = Path(__file__).resolve().parent.parent / "src" / "説明.txt"
         self._pending_messages: List[str] = []
+        self.goal_location: Optional[Tuple[int, Coord]] = None
+        self.required_keys: int = int(config.get("required_keys", 3))
+        self._key_positions: Dict[int, Set[Coord]] = defaultdict(set)
 
 
         doors_cfg = config.get("doors", [])
@@ -40,12 +43,26 @@ class GameState:
             )
 
 
-        goal_cfg: Union[Dict, List[Dict], None] = config.get("goal")
-        if isinstance(goal_cfg, dict):
-            self.map.set_goal(int(goal_cfg["room"]), tuple(goal_cfg["pos"]))
-        elif isinstance(goal_cfg, list):
-            for g in goal_cfg:
-                self.map.set_goal(int(g["room"]), tuple(g["pos"]))
+        goal_candidates = config.get("goal_candidates")
+        if goal_candidates:
+            chosen_goal = random.choice(goal_candidates)
+            room_idx = int(chosen_goal["room"])
+            pos = tuple(chosen_goal["pos"])
+            self.map.set_goal(room_idx, pos)
+            self.goal_location = (room_idx, pos)
+        else:
+            goal_cfg: Union[Dict, List[Dict], None] = config.get("goal")
+            if isinstance(goal_cfg, dict):
+                room_idx = int(goal_cfg["room"])
+                pos = tuple(goal_cfg["pos"])
+                self.map.set_goal(room_idx, pos)
+                self.goal_location = (room_idx, pos)
+            elif isinstance(goal_cfg, list):
+                for g in goal_cfg:
+                    room_idx = int(g["room"])
+                    pos = tuple(g["pos"])
+                    self.map.set_goal(room_idx, pos)
+                    self.goal_location = (room_idx, pos)
 
         forbidden_positions = self._build_forbidden_positions(doors_cfg)
         for o in config.get("obstacles", []):
@@ -63,17 +80,31 @@ class GameState:
             )
 
         key_spots = config.get("key_spots", [])
-        self._key_location: Optional[Tuple[int, Coord]] = None
         if key_spots:
-            chosen = random.choice(key_spots)
-            self._key_location = (int(chosen["room"]), tuple(chosen["pos"]))
+            filtered_spots = [
+                spot
+                for spot in key_spots
+                if (
+                    (not self.goal_location or int(spot["room"]) != self.goal_location[0])
+                    and not self.map.rooms[int(spot["room"])].has_obstacle(tuple(spot["pos"]))
+                )
+            ]
+            if len(filtered_spots) < self.required_keys:
+                raise ValueError("Not enough key spots to place required keys.")
+            chosen_spots = random.sample(filtered_spots, self.required_keys)
+            for entry in chosen_spots:
+                room_idx = int(entry["room"])
+                pos = tuple(entry["pos"])
+                self._key_positions[room_idx].add(pos)
 
         decoy_spots = config.get("key_decoy_spots", [])
         self._decoy_positions: Dict[int, Set[Coord]] = defaultdict(set)
         for entry in decoy_spots:
             room_idx = int(entry["room"])
             pos = tuple(entry["pos"])
-            if self._key_location and room_idx == self._key_location[0] and pos == self._key_location[1]:
+            if self.map.rooms[room_idx].has_obstacle(pos):
+                continue
+            if pos in self._key_positions.get(room_idx, set()):
                 continue
             self._decoy_positions[room_idx].add(pos)
 
@@ -150,7 +181,7 @@ class GameState:
             self.caught_by_oni = True
 
     def _update_goal_flag(self) -> None:
-        self.goal_reached = self.map.has_goal_at(self.player.pos) and self.player.has_key
+        self.goal_reached = self.map.has_goal_at(self.player.pos) and self.player.keys_collected >= self.required_keys
 
     def draw(self) -> None:
         enemies = self.oni.enemy_positions_in_room(self.map.current_room)
@@ -176,9 +207,9 @@ class GameState:
         print(stripped)
 
     def _print_key_status(self) -> None:
-        if not self.player.has_key:
+        if self.player.keys_collected == 0:
             return
-        print("\n[Status] 🔑 鍵を所持している！")
+        print(f"\n[Status] 🔑 鍵 {self.player.keys_collected}/{self.required_keys}")
 
     # ---- 障害物関連 ----
     def _build_forbidden_positions(self, doors_cfg: List[Dict]) -> Dict[int, set]:
@@ -221,27 +252,26 @@ class GameState:
 
     # ---- 鍵関連 ----
     def _check_key_pickup(self) -> None:
-        if self.player.has_key or self._key_location is None:
+        key_positions = self._key_positions.get(self.map.current_room)
+        if not key_positions:
             return
-        key_room, key_pos = self._key_location
-        if key_room == self.map.current_room and key_pos == self.player.pos:
+        if self.player.pos in key_positions:
+            key_positions.remove(self.player.pos)
             self.player.obtain_key()
-            self._key_location = None
-            self._queue_message("🔑 鍵を手に入れた！")
+            self._queue_message(f"🔑 鍵を手に入れた！（{self.player.keys_collected}/{self.required_keys}）")
 
     def _notify_key_requirement_if_needed(self) -> None:
-        if self.player.has_key:
+        if self.player.keys_collected >= self.required_keys:
             return
         if self.map.has_goal_at(self.player.pos) and not self._key_prompt_displayed:
-            print("ゴールのドアは鍵が必要だ…")
+            print(f"ゴールのドアには鍵が{self.required_keys}本必要だ…（現在 {self.player.keys_collected}）")
             self._key_prompt_displayed = True
 
     def _items_in_current_room(self) -> Dict[Coord, str]:
         items: Dict[Coord, str] = {}
-        if self._key_location is not None and not self.player.has_key:
-            key_room, key_pos = self._key_location
-            if key_room == self.map.current_room:
-                items[key_pos] = "？"
+        key_positions = self._key_positions.get(self.map.current_room, set())
+        for pos in key_positions:
+            items[pos] = "？"
 
         decoys = self._decoy_positions.get(self.map.current_room, set())
         for pos in decoys:
@@ -265,10 +295,9 @@ class GameState:
             self._queue_message("？マスだが、鍵は見当たらなかった…。")
 
     def _question_tile_type(self, room_idx: int, pos: Coord) -> Optional[Literal["key", "decoy"]]:
-        if self._key_location and not self.player.has_key:
-            key_room, key_pos = self._key_location
-            if key_room == room_idx and key_pos == pos:
-                return "key"
+        key_positions = self._key_positions.get(room_idx)
+        if key_positions and pos in key_positions:
+            return "key"
         decoys = self._decoy_positions.get(room_idx)
         if decoys and pos in decoys:
             return "decoy"
