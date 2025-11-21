@@ -489,9 +489,22 @@ def clear_screen() -> None:
     else:
         print("\033[2J\033[H", end="", flush=True)
 
+def choose_lives() -> int:
+    while True:
+        choice = input("残機を1～3から選んでください（Enterで3）: ").strip()
+        if choice == "":
+            return 3
+        if choice in ("1", "2", "3"):
+            return int(choice)
+        print("1, 2, 3 のいずれかを入力してください。")
+
 
 def main():
-    gs = GameState(CONFIG)
+    lives = choose_lives()
+    config = dict(CONFIG)
+    config["lives"] = lives
+
+    gs = GameState(config)
     clear_screen()
     gs.draw()
     for msg in gs.consume_pending_messages():
