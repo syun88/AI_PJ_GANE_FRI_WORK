@@ -1,5 +1,7 @@
 import os
 import sys
+import time
+from collections import deque
 from typing import List, Optional, Set, Tuple
 from gamestate import GameState
 
@@ -435,52 +437,169 @@ CONFIG = {
     ],
 }
 
-def read_key() -> str:
 
-    try:
-        import msvcrt
-        while True:
-            ch = msvcrt.getch()
-            if ch in (b"q", b"Q"):
-                return "q"
-            if ch in (b"w", b"W", b"a", b"A", b"s", b"S", b"d", b"D"):
-                return ch.decode().lower()
-            if ch in (b"\x00", b"\xe0"):
-                code = msvcrt.getch()[0]
-                if code == 72:
-                    return "up"
-                if code == 80:
-                    return "down"
-                if code == 75:
-                    return "left"
-                if code == 77:
-                    return "right"
-    except ImportError:
-        import tty, termios
-        fd = sys.stdin.fileno()
-        old = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            while True:
-                ch1 = sys.stdin.read(1)
-                if ch1 in ("q", "Q"):
-                    return "q"
-                if ch1.lower() in ("w", "a", "s", "d"):
-                    return ch1.lower()
-                if ch1 == "\x1b":
-                    ch2 = sys.stdin.read(1)
-                    if ch2 == "[":
-                        ch3 = sys.stdin.read(1)
-                        if ch3 == "A":
-                            return "up"
-                        if ch3 == "B":
-                            return "down"
-                        if ch3 == "D":
-                            return "left"
-                        if ch3 == "C":
-                            return "right"
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old)
+class AutoExplorer:
+    """
+    盤面の障害物とドアを考慮しながら最短手で鍵とゴールを巡る簡易AI。
+    BFSでルートを探索し、毎手盤面を描画して進捗を表示する。
+    """
+
+    _DIRS = [(-1, 0), (1, 0), (0, -1), (0, 1)]
+    _DIR_LABEL = {
+        (-1, 0): "北へ移動",
+        (1, 0): "南へ移動",
+        (0, -1): "西へ移動",
+        (0, 1): "東へ移動",
+    }
+
+    def __init__(self, game_state: GameState, *, delay: float = 0.15):
+        self.gs = game_state
+        self.delay = delay
+
+    def play(self) -> None:
+        clear_screen()
+        self.gs.draw()
+        self._print_pending_messages()
+        print(f"AI が探索を開始します。残機 {self.gs.lives_remaining}/{self.gs.initial_lives}")
+
+        if self.gs.goal_location is None:
+            print("ゴール位置が未設定のためAIを実行できません。")
+            return
+        if self.gs.goal_reached:
+            print("\n🎉 ゴール！ゲームクリア！")
+            return
+
+        while not self.gs.goal_reached and not self.gs.caught_by_oni:
+            target = self._choose_target()
+            if target is None:
+                print("AI は有効な目的地を見つけられず探索を終了します。")
+                break
+
+            self._announce_target(target)
+            path = self._find_path(self._current_state(), target)
+            if path is None:
+                print("目標へのルートが見つからなかったため探索を断念します。")
+                break
+
+            self._follow_path(path)
+
+        self._print_outcome()
+
+    def _current_state(self) -> Tuple[int, Tuple[int, int]]:
+        return self.gs.map.current_room, self.gs.player.pos
+
+    def _choose_target(self) -> Optional[Tuple[int, Tuple[int, int]]]:
+        if self.gs.player.keys_collected < self.gs.required_keys:
+            return self._next_key_target()
+        return self.gs.goal_location
+
+    def _next_key_target(self) -> Optional[Tuple[int, Tuple[int, int]]]:
+        remaining = self.gs.remaining_key_positions()
+        if not remaining:
+            return None
+        ordered: List[Tuple[int, Tuple[int, int]]] = []
+        for room_idx in sorted(remaining.keys()):
+            for pos in sorted(remaining[room_idx]):
+                ordered.append((room_idx, pos))
+        return ordered[0] if ordered else None
+
+    def _announce_target(self, target: Tuple[int, Tuple[int, int]]) -> None:
+        room_idx, (row, col) = target
+        if self.gs.goal_location and target == self.gs.goal_location:
+            label = "ゴール"
+        else:
+            label = f"鍵 {self.gs.player.keys_collected + 1}"
+        print(f"\n[AI] 目的地: {label} (room={room_idx}, row={row}, col={col})")
+
+    def _find_path(
+        self,
+        start: Tuple[int, Tuple[int, int]],
+        goal: Tuple[int, Tuple[int, int]],
+    ) -> Optional[List[Tuple[int, int]]]:
+        if start == goal:
+            return []
+
+        queue = deque([start])
+        visited = {start: None}
+        move_taken: dict[Tuple[int, Tuple[int, int]], Tuple[int, int]] = {}
+
+        while queue:
+            room_idx, pos = queue.popleft()
+            if (room_idx, pos) == goal:
+                break
+            for next_state, move in self._neighbors(room_idx, pos):
+                if next_state in visited:
+                    continue
+                visited[next_state] = (room_idx, pos)
+                move_taken[next_state] = move
+                queue.append(next_state)
+        else:
+            return None
+
+        path: List[Tuple[int, int]] = []
+        cursor = goal
+        while cursor != start:
+            move = move_taken.get(cursor)
+            prev = visited.get(cursor)
+            if move is None or prev is None:
+                return None
+            path.append(move)
+            cursor = prev
+        path.reverse()
+        return path
+
+    def _neighbors(
+        self,
+        room_idx: int,
+        pos: Tuple[int, int],
+    ) -> List[Tuple[Tuple[int, Tuple[int, int]], Tuple[int, int]]]:
+        results: List[Tuple[Tuple[int, Tuple[int, int]], Tuple[int, int]]] = []
+        for dr, dc in self._DIRS:
+            nr, nc = pos[0] + dr, pos[1] + dc
+            if not self.gs.map.in_bounds(nr, nc):
+                continue
+            if self.gs.map.is_blocked(room_idx, (nr, nc)):
+                continue
+            next_room = room_idx
+            next_pos = (nr, nc)
+            door = self.gs.map.rooms[room_idx].get_door((nr, nc))
+            if door:
+                next_room = door.target_room
+                next_pos = door.target_pos
+                if self.gs.map.is_blocked(next_room, next_pos):
+                    continue
+            results.append(((next_room, next_pos), (dr, dc)))
+        return results
+
+    def _follow_path(self, moves: List[Tuple[int, int]]) -> None:
+        if not moves:
+            self.gs.process_current_tile()
+            self._print_pending_messages()
+            return
+
+        total = len(moves)
+        for idx, (dr, dc) in enumerate(moves, start=1):
+            if self.gs.goal_reached or self.gs.caught_by_oni:
+                break
+            time.sleep(self.delay)
+            clear_screen()
+            self.gs.try_move(dr, dc)
+            self.gs.draw()
+            direction = self._DIR_LABEL.get((dr, dc), f"({dr},{dc})")
+            print(f"[AI] {direction} （{idx}/{total}）")
+            self._print_pending_messages()
+
+    def _print_pending_messages(self) -> None:
+        for msg in self.gs.consume_pending_messages():
+            print(msg)
+
+    def _print_outcome(self) -> None:
+        if self.gs.goal_reached:
+            print("\n🎉 AI がゴールに到達しました！ゲームクリア！")
+        elif self.gs.caught_by_oni:
+            print("\n💀 AI は鬼に捕まってしまった…ゲームオーバー")
+        else:
+            print("\n⚠️ AI は探索を完了できませんでした。")
 
 
 def clear_screen() -> None:
@@ -489,58 +608,41 @@ def clear_screen() -> None:
     else:
         print("\033[2J\033[H", end="", flush=True)
 
-def choose_lives() -> int:
-    while True:
-        choice = input("残機を1～3から選んでください（Enterで3）: ").strip()
-        if choice == "":
-            return 3
-        if choice in ("1", "2", "3"):
-            return int(choice)
-        print("1, 2, 3 のいずれかを入力してください。")
+def resolve_lives_setting(default: int = 3) -> int:
+    """
+    残機設定をCLI引数または環境変数から取得（どちらもなければ既定値）。
+    優先順位: 第1引数 > 環境変数 AI_LIVES > default
+    """
+    raw: Optional[str] = None
+    if len(sys.argv) > 1:
+        raw = sys.argv[1]
+    elif "AI_LIVES" in os.environ:
+        raw = os.environ["AI_LIVES"]
+
+    if raw:
+        try:
+            value = int(raw)
+            return max(1, min(3, value))
+        except ValueError:
+            pass
+    return default
 
 
 def main():
-    lives = choose_lives()
     config = dict(CONFIG)
-    config["lives"] = lives
+    config["lives"] = resolve_lives_setting()
 
     gs = GameState(config)
-    clear_screen()
-    gs.draw()
-    for msg in gs.consume_pending_messages():
-        print(msg)
+    delay = 0.15
+    env_delay = os.getenv("AI_PLAY_DELAY")
+    if env_delay:
+        try:
+            delay = max(0.0, float(env_delay))
+        except ValueError:
+            pass
 
-    print("矢印キーで移動、Qで終了（WASDでも可）")
-    if gs.goal_reached:
-        print("\n🎉 ゴール！ゲームクリア！")
-        return
-
-    key_to_move = {
-        "up": (-1, 0), "down": (1, 0),
-        "left": (0, -1), "right": (0, 1),
-        "w": (-1, 0), "s": (1, 0),
-        "a": (0, -1), "d": (0, 1),
-    }
-
-    while True:
-        k = read_key()
-        if k == "q":
-            print("\n終了します。")
-            break
-        if k in key_to_move:
-            dr, dc = key_to_move[k]
-            clear_screen()
-            gs.try_move(dr, dc)
-            gs.draw()
-            for msg in gs.consume_pending_messages():
-                print(msg)
-
-            if gs.goal_reached:
-                print("\n🎉 ゴール！ゲームクリア！")
-                break
-            if gs.caught_by_oni:
-                print("\n💀 鬼に捕まりました…ゲームオーバー")
-                break
+    ai = AutoExplorer(gs, delay=delay)
+    ai.play()
 
 
 if __name__ == "__main__":

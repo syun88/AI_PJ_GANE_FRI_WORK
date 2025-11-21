@@ -298,6 +298,28 @@ class GameState:
             self.player.obtain_key()
             self._queue_message(f"🔑 鍵を手に入れた！（{self.player.keys_collected}/{self.required_keys}）")
 
+    def remaining_key_positions(self) -> Dict[int, Set[Coord]]:
+        """
+        Return copies of remaining genuine key coordinates keyed by room index.
+        AI がルート計画に利用するためのヘルパー（状態は変更しない）。
+        """
+        return {
+            room_idx: set(positions)
+            for room_idx, positions in self._key_positions.items()
+            if positions
+        }
+
+    def process_current_tile(self) -> None:
+        """
+        Resolve pickups/notifications without issuing a movement command.
+        目的地が現在位置と同じ場合でも拾得イベントを発生させるためのヘルパー。
+        """
+        self._notify_question_tile_if_needed()
+        self._check_key_pickup()
+        self._check_decoy_tile()
+        self._update_goal_flag()
+        self._notify_key_requirement_if_needed()
+
     def _notify_key_requirement_if_needed(self) -> None:
         if self.player.keys_collected >= self.required_keys:
             return
