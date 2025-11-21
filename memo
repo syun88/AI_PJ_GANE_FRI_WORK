@@ -7,3 +7,8 @@ Map
 10字キー移動自動enterなし
 部屋のワープ自動
 
+
+
+read_key
+Windows では msvcrt.getch()、Mac/Linux では tty と termios を使ってキー入力を逐次読み取っています。
+Python 標準ライブラリで生入力モードにし、押されたキーを即座に判別しているだけです。
