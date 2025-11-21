@@ -31,6 +31,9 @@ class GameState:
         self.goal_location: Optional[Tuple[int, Coord]] = None
         self.required_keys: int = int(config.get("required_keys", 3))
         self._key_positions: Dict[int, Set[Coord]] = defaultdict(set)
+        self.initial_lives: int = max(1, int(config.get("lives", 3)))
+        self.lives_remaining: int = self.initial_lives
+        self._respawn_safe_room: Optional[int] = None
 
 
         doors_cfg = config.get("doors", [])
@@ -146,6 +149,7 @@ class GameState:
         if self.map.current_room != prev_room:
             self.oni.notify_entered_another_room_first_time()
             self.oni.notify_player_room_changed(self.map.current_room)
+        self._clear_respawn_safe_room_if_needed()
         self.player.set_position(new_pos)
 
         self._notify_question_tile_if_needed()
@@ -160,25 +164,30 @@ class GameState:
 
         # ここから鬼の処理
         # 1) プレイヤー歩数カウント（5マス抽選のため）
-        self.oni.notify_player_step()
+        if not self._is_in_respawn_safe_room():
+            self.oni.notify_player_step()
 
-        # 2) 抽選タイミングなら出現試行（同室のドアから）
-        self.oni.try_spawn_if_due(
-            current_room_idx=self.map.current_room,
-            door_positions=self.map.door_positions_in_room(self.map.current_room),
-            player_pos=self.player.pos,
-        )
+            # 2) 抽選タイミングなら出現試行（同室のドアから）
+            self.oni.try_spawn_if_due(
+                current_room_idx=self.map.current_room,
+                door_positions=self.map.door_positions_in_room(self.map.current_room),
+                player_pos=self.player.pos,
+            )
 
-        # 3) 鬼の追跡移動（同室時のみ1～2歩）
-        if self.oni.move_oni_toward(
-            current_room_idx=self.map.current_room,
-            player_pos=self.player.pos,
-            in_bounds_fn=self.map.in_bounds,
-            door_transition_fn=self.map.resolve_door_transition,
-            door_to_room_fn=self.map.door_positions_to_room,
-            is_blocked_fn=self.map.is_blocked,
-        ):
-            self.caught_by_oni = True
+            # 3) 鬼の追跡移動（同室時のみ1～2歩）
+            if self.oni.move_oni_toward(
+                current_room_idx=self.map.current_room,
+                player_pos=self.player.pos,
+                in_bounds_fn=self.map.in_bounds,
+                door_transition_fn=self.map.resolve_door_transition,
+                door_to_room_fn=self.map.door_positions_to_room,
+                is_blocked_fn=self.map.is_blocked,
+            ):
+                self._handle_player_caught()
+        else:
+            # 安全部屋では鬼を出現させない
+            if self.oni.oni is not None:
+                self.oni.despawn()
 
     def _update_goal_flag(self) -> None:
         self.goal_reached = self.map.has_goal_at(self.player.pos) and self.player.keys_collected >= self.required_keys
@@ -189,6 +198,8 @@ class GameState:
         self.map.render(self.player.pos, enemies=enemies, items=items)
         self._print_explanation_text()
         self._print_key_status()
+        self._print_life_status()
+        self._print_respawn_warning()
 
     def consume_pending_messages(self) -> List[str]:
         messages = self._pending_messages[:]
@@ -210,6 +221,13 @@ class GameState:
         if self.player.keys_collected == 0:
             return
         print(f"\n[Status] 🔑 鍵 {self.player.keys_collected}/{self.required_keys}")
+
+    def _print_life_status(self) -> None:
+        print(f"[Status] 残機 {self.lives_remaining}")
+
+    def _print_respawn_warning(self) -> None:
+        if self._is_in_respawn_safe_room():
+            print("この部屋を出るまで鬼は再出現しない。")
 
     # ---- 障害物関連 ----
     def _build_forbidden_positions(self, doors_cfg: List[Dict]) -> Dict[int, set]:
@@ -249,6 +267,26 @@ class GameState:
                     continue
                 return candidate
         return None
+
+    # ---- 残機 / 復活関連 ----
+    def _handle_player_caught(self) -> None:
+        if self.lives_remaining <= 1:
+            self.caught_by_oni = True
+            return
+        self.lives_remaining -= 1
+        self.oni.despawn()
+        self.oni.reset_spawn_progress()
+        self._respawn_safe_room = self.map.current_room
+        self._queue_message(
+            f"💀 鬼に捕まった…残機はあと{self.lives_remaining}。この部屋を出るまで鬼は再出現しない。"
+        )
+
+    def _is_in_respawn_safe_room(self) -> bool:
+        return self._respawn_safe_room is not None and self.map.current_room == self._respawn_safe_room
+
+    def _clear_respawn_safe_room_if_needed(self) -> None:
+        if self._respawn_safe_room is not None and self.map.current_room != self._respawn_safe_room:
+            self._respawn_safe_room = None
 
     # ---- 鍵関連 ----
     def _check_key_pickup(self) -> None:
