@@ -1,7 +1,11 @@
 import os
 import sys
-from typing import Optional, Set, Tuple
+from typing import List, Optional, Set, Tuple
 from gamestate import GameState
+
+ROOM_HEIGHT = 10
+ROOM_WIDTH = 20
+PREVIOUS_ROOM_WIDTH = 30
 
 
 def make_grid_doors(h=6, w=6, grid_r=3, grid_c=3):
@@ -73,13 +77,36 @@ def generate_extra_obstacles(
     return extras
 
 
+def scale_column(col: int, *, old_w: int = PREVIOUS_ROOM_WIDTH, new_w: int = ROOM_WIDTH) -> int:
+    if not 0 <= col < old_w:
+        raise ValueError(f"Column {col} is outside expected range 0-{old_w - 1}")
+    if new_w == 1:
+        return 0
+    return round(col * (new_w - 1) / (old_w - 1))
+
+
+def scale_pos(pos: Tuple[int, int]) -> Tuple[int, int]:
+    r, c = pos
+    return (r, scale_column(c))
+
+
+def scale_entries(entries: List[dict]) -> List[dict]:
+    scaled: List[dict] = []
+    for entry in entries:
+        room_idx = int(entry["room"])
+        r, c = entry["pos"]
+        scaled.append({"room": room_idx, "pos": (int(r), scale_column(int(c)))})
+    return scaled
+
+
 GRID_ROWS = 4
 GRID_COLS = 4
-ROOM_HEIGHT = 10
-ROOM_WIDTH = 30
 START_ROOM = 0
-START_POS = (9, 14)
-GOAL_POS = (5, 15)
+BASE_START_POS = (9, 14)
+BASE_GOAL_POS = (5, 15)
+
+START_POS = scale_pos(BASE_START_POS)
+GOAL_POS = scale_pos(BASE_GOAL_POS)
 
 corner_rooms = corner_room_indices(GRID_ROWS, GRID_COLS)
 goal_rooms = [idx for idx in corner_rooms if idx != START_ROOM]
@@ -105,7 +132,7 @@ CONFIG = {
     "required_keys": 3,
     "start": {"room": START_ROOM, "pos": START_POS},
     "doors": DOORS,
-    "key_spots": [
+    "key_spots": scale_entries([
         {"room": 2, "pos": (5, 22)},
         {"room": 5, "pos": (7, 12)},
         {"room": 7, "pos": (3, 18)},
@@ -121,8 +148,8 @@ CONFIG = {
         {"room": 10, "pos": (4, 18)},
         {"room": 12, "pos": (5, 6)},
         {"room": 13, "pos": (2, 24)},
-    ],
-    "key_decoy_spots": [
+    ]),
+    "key_decoy_spots": scale_entries([
         {"room": 0, "pos": (1, 15)},
         {"room": 1, "pos": (6, 18)},
         {"room": 3, "pos": (7, 12)},
@@ -143,8 +170,8 @@ CONFIG = {
         {"room": 4, "pos": (6, 6)},
         {"room": 8, "pos": (5, 20)},
         {"room": 10, "pos": (3, 24)},
-    ],
-    "obstacles": [
+    ]),
+    "obstacles": scale_entries([
         # room 0
         {"room": 0, "pos": (2, 5)},
         {"room": 0, "pos": (2, 6)},
@@ -401,7 +428,7 @@ CONFIG = {
         {"room": 15, "pos": (4, 18)},
         {"room": 15, "pos": (4, 19)},
         {"room": 15, "pos": (5, 19)},
-    ] + EXTRA_OBSTACLES,
+    ]) + EXTRA_OBSTACLES,
     "goal_candidates": [
         {"room": room_idx, "pos": GOAL_POS}
         for room_idx in goal_rooms
