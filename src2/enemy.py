@@ -25,7 +25,19 @@ class OniManager:
         self.enabled_after_second_room: bool = False
         self.player_steps_since_enabled: int = 0
         self.oni: Optional[Oni] = None
-        self._spawn_chances = (10, 25, 45, 70, 100)
+        # 5歩ごとの判定で10%から10%ずつ上昇し、10回目（50歩目）で100%
+        self._spawn_chances = (
+            10,
+            20,
+            30,
+            40,
+            50,
+            60,
+            70,
+            80,
+            90,
+            100,
+        )
         self._spawn_stage = 0
         self._player_rooms_since_spawn: Set[int] = set()
         self._player_room_at_spawn: Optional[int] = None
