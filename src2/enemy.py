@@ -99,6 +99,11 @@ class OniManager:
         self._player_rooms_since_spawn.clear()
         self._player_room_at_spawn = None
 
+    def reset_spawn_progress(self):
+        """Reset spawn counters without disabling Oni feature."""
+        self.player_steps_since_enabled = 0
+        self._spawn_stage = 0
+
     # ---- 追跡（同室のときのみ）----
     def move_oni_toward(
         self,
